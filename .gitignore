@@ -21,3 +21,8 @@ DerivedData/
 /web/node_modules
 /web/.wrangler
 CodexUsageBar.xcodeproj/project.xcworkspace/
+
+# Local-only extracted vendor artwork; the public build uses AppIcon-1024.png.
+/Resources/OfficialCodexLogo.png
+/Resources/OfficialCodexMenuTemplate.png
+/Scripts/extract_official_menu_icon.swift
