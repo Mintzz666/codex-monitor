@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Verify source and build release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          make public-release-check
+          make test
+          make xcode-project
+          VERSION="$VERSION" BUILD_NUMBER="${GITHUB_RUN_NUMBER}" make release-package
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES="docs/release-notes/v${VERSION}.md"
+          if [[ ! -f "$NOTES" ]]; then
+            NOTES="README.md"
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/Codex-Monitor-v${VERSION}-universal.dmg" \
+            "dist/Codex-Monitor-v${VERSION}-universal.dmg.sha256" \
+            --verify-tag \
+            --title "Codex Monitor ${VERSION}" \
+            --notes-file "$NOTES"

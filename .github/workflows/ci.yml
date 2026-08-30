@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    runs-on: macos-26
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Public release privacy check
+        run: make public-release-check
+
+      - name: Generate Xcode projects
+        run: |
+          make xcode-project
+          (cd Mobile && xcodegen generate --spec project.yml)
+
+      - name: Check Swift formatting
+        run: swift format lint --recursive Sources Tests Mobile/Sources Package.swift
+
+      - name: Run deterministic verifier
+        run: make test
+
+      - name: Build macOS widget
+        run: make widget-build
+
+      - name: Compile iPhone app and widget
+        run: |
+          xcodebuild \
+            -project Mobile/CodexMonitorMobile.xcodeproj \
+            -scheme CodexMonitorMobile \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package local macOS app and DMG
+        env:
+          VERSION: 1.4.1
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: make release-package
+
+      - name: Verify artifacts
+        run: |
+          APP="dist/Codex Monitor.app"
+          WIDGET="$APP/Contents/PlugIns/CodexMonitorWidget.appex"
+          DMG="dist/Codex-Monitor-v1.4.1-universal.dmg"
+          test -d "$APP"
+          test -d "$WIDGET"
+          test -f "$DMG"
+          test -f "$DMG.sha256"
+          plutil -lint "$APP/Contents/Info.plist"
+          plutil -lint "$WIDGET/Contents/Info.plist"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          (
+            cd dist
+            shasum -a 256 -c "$(basename "$DMG").sha256"
+          )

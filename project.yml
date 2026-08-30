@@ -1,0 +1,92 @@
+name: CodexUsageBar
+
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    macOS: "13.0"
+  groupSortPosition: top
+
+settings:
+  base:
+    APP_GROUP_IDENTIFIER: group.com.example.codexmonitor
+    CURRENT_PROJECT_VERSION: 30
+    DEVELOPMENT_LANGUAGE: zh_CN
+    ENABLE_HARDENED_RUNTIME: YES
+    MARKETING_VERSION: 1.4.1
+    SWIFT_VERSION: 5.0
+
+targets:
+  CodexUsageCore:
+    type: library.static
+    platform: macOS
+    sources:
+      - Sources/CodexUsageCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor.core
+        PRODUCT_NAME: CodexUsageCore
+
+  CodexUsageShared:
+    type: library.static
+    platform: macOS
+    sources:
+      - Sources/CodexUsageShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor.shared
+        PRODUCT_NAME: CodexUsageShared
+
+  CodexUsageBar:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/CodexUsageBar
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
+      - path: Resources/AppIcon/AppIcon-1024.png
+        buildPhase: resources
+      - path: docs/images/epd-v1-preview.png
+        buildPhase: resources
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Resources/CodexUsageBar.entitlements
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor
+        PRODUCT_NAME: Codex Monitor
+    dependencies:
+      - target: CodexUsageCore
+      - target: CodexUsageShared
+      - target: CodexUsageWidget
+
+  CodexUsageWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Sources/CodexUsageWidget
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: Resources/CodexUsageWidget.entitlements
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Resources/WidgetInfo.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor.widget
+        PRODUCT_NAME: CodexMonitorWidget
+        SKIP_INSTALL: YES
+    dependencies:
+      - target: CodexUsageShared
+
+schemes:
+  CodexUsageBar:
+    build:
+      targets:
+        CodexUsageBar: all
+        CodexUsageCore: all
+        CodexUsageShared: all
+        CodexUsageWidget: all
+    run:
+      config: Debug
+    archive:
+      config: Release
