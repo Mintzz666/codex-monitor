@@ -36,9 +36,15 @@ jobs:
           if [[ ! -f "$NOTES" ]]; then
             NOTES="README.md"
           fi
-          gh release create "$GITHUB_REF_NAME" \
-            "dist/Codex-Monitor-v${VERSION}-universal.dmg" \
-            "dist/Codex-Monitor-v${VERSION}-universal.dmg.sha256" \
-            --verify-tag \
-            --title "Codex Monitor ${VERSION}" \
-            --notes-file "$NOTES"
+          ASSETS=(
+            "dist/Codex-Monitor-v${VERSION}-universal.dmg"
+            "dist/Codex-Monitor-v${VERSION}-universal.dmg.sha256"
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${ASSETS[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${ASSETS[@]}" \
+              --verify-tag \
+              --title "Codex Monitor ${VERSION}" \
+              --notes-file "$NOTES"
+          fi
