@@ -1,5 +1,41 @@
 import Foundation
 
+public struct SharedUsageWindow: Codable, Equatable, Sendable, Identifiable {
+  public let id: String
+  public let label: String?
+  public let usedPercent: Double
+  public let windowDurationMinutes: Int
+  public let resetsAt: Date?
+
+  public init(
+    id: String,
+    label: String?,
+    usedPercent: Double,
+    windowDurationMinutes: Int,
+    resetsAt: Date?
+  ) {
+    self.id = id
+    self.label = label
+    self.usedPercent = min(100, max(0, usedPercent))
+    self.windowDurationMinutes = windowDurationMinutes
+    self.resetsAt = resetsAt
+  }
+
+  public var remainingPercent: Double { max(0, 100 - usedPercent) }
+}
+
+public struct SharedDailyTokenUsage: Codable, Equatable, Sendable, Identifiable {
+  public let startDate: String
+  public let tokens: Int64
+
+  public init(startDate: String, tokens: Int64) {
+    self.startDate = startDate
+    self.tokens = max(0, tokens)
+  }
+
+  public var id: String { startDate }
+}
+
 public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
   public let usedPercent: Double
   public let resetsAt: Date?
@@ -9,8 +45,9 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
   public let windowDurationMinutes: Int?
   public let languageCode: String?
   public let subscriptionID: String?
-  public let fiveHourUsedPercent: Double?
-  public let fiveHourResetsAt: Date?
+  public let additionalWindows: [SharedUsageWindow]?
+  public let dailyTokenUsage: [SharedDailyTokenUsage]?
+  public let lifetimeTokens: Int64?
 
   public init(
     usedPercent: Double,
@@ -21,8 +58,9 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
     windowDurationMinutes: Int? = nil,
     languageCode: String? = nil,
     subscriptionID: String? = nil,
-    fiveHourUsedPercent: Double? = nil,
-    fiveHourResetsAt: Date? = nil
+    additionalWindows: [SharedUsageWindow]? = nil,
+    dailyTokenUsage: [SharedDailyTokenUsage]? = nil,
+    lifetimeTokens: Int64? = nil
   ) {
     self.usedPercent = min(100, max(0, usedPercent))
     self.resetsAt = resetsAt
@@ -32,18 +70,13 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
     self.windowDurationMinutes = windowDurationMinutes
     self.languageCode = languageCode
     self.subscriptionID = subscriptionID
-    self.fiveHourUsedPercent = fiveHourUsedPercent.map {
-      min(100, max(0, $0))
-    }
-    self.fiveHourResetsAt = fiveHourResetsAt
+    self.additionalWindows = additionalWindows
+    self.dailyTokenUsage = dailyTokenUsage
+    self.lifetimeTokens = lifetimeTokens
   }
 
   public var remainingPercent: Double {
     max(0, 100 - usedPercent)
-  }
-
-  public var fiveHourRemainingPercent: Double? {
-    fiveHourUsedPercent.map { max(0, 100 - $0) }
   }
 
   public func isStale(
@@ -55,9 +88,9 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
 }
 
 public enum SharedUsageConfiguration {
-  public static let widgetKind = "io.cmmuu.codex-usage-bar.usage-widget"
+  public static let widgetKind = "com.example.codexmonitor.usage-widget"
   public static let fallbackAppGroupIdentifier =
-    "group.io.cmmuu.codex-usage-bar"
+    "group.com.example.codexmonitor"
 
   public static func appGroupIdentifier(
     bundle: Bundle = .main

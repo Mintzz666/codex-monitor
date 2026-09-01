@@ -1,24 +1,21 @@
 name: CodexUsageBar
 
 options:
-  bundleIdPrefix: io.cmmuu
+  bundleIdPrefix: com.example
   deploymentTarget:
     macOS: "13.0"
   groupSortPosition: top
 
 settings:
   base:
-    APP_GROUP_IDENTIFIER: group.io.cmmuu.codex-usage-bar
-    CURRENT_PROJECT_VERSION: 6
+    APP_BUNDLE_IDENTIFIER: com.example.codexmonitor
+    APP_GROUP_IDENTIFIER: group.com.example.codexmonitor
+    CURRENT_PROJECT_VERSION: 38
     DEVELOPMENT_LANGUAGE: zh_CN
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: 0.3.4
+    MARKETING_VERSION: 1.4.2
     SWIFT_VERSION: 5.0
-
-packages:
-  Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
-    exactVersion: 2.9.4
+    WIDGET_BUNDLE_IDENTIFIER: com.example.codexmonitor.widget
 
 targets:
   CodexUsageCore:
@@ -28,7 +25,7 @@ targets:
       - Sources/CodexUsageCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.cmmuu.codex-usage-core
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor.core
         PRODUCT_NAME: CodexUsageCore
 
   CodexUsageShared:
@@ -38,7 +35,7 @@ targets:
       - Sources/CodexUsageShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.cmmuu.codex-usage-shared
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor.shared
         PRODUCT_NAME: CodexUsageShared
 
   CodexUsageBar:
@@ -48,19 +45,24 @@ targets:
       - Sources/CodexUsageBar
       - path: Resources/AppIcon.icns
         buildPhase: resources
+      - path: Resources/AppIcon/AppIcon-1024.png
+        buildPhase: resources
+      - path: Resources/OfficialCodexMenuTemplate.png
+        buildPhase: resources
+      - path: docs/images/epd-v1-preview.png
+        buildPhase: resources
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Resources/CodexUsageBar.entitlements
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: io.cmmuu.codex-usage-bar
-        PRODUCT_NAME: Codex Usage Bar
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER)
+        PRODUCT_NAME: Codex Monitor
     dependencies:
       - target: CodexUsageCore
       - target: CodexUsageShared
       - target: CodexUsageWidget
-      - package: Sparkle
 
   CodexUsageWidget:
     type: app-extension
@@ -74,8 +76,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/WidgetInfo.plist
-        PRODUCT_BUNDLE_IDENTIFIER: io.cmmuu.codex-usage-bar.widget
-        PRODUCT_NAME: CodexUsageWidget
+        PRODUCT_BUNDLE_IDENTIFIER: $(WIDGET_BUNDLE_IDENTIFIER)
+        PRODUCT_NAME: CodexMonitorWidget
         SKIP_INSTALL: YES
     dependencies:
       - target: CodexUsageShared

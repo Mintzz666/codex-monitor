@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---|---|
-| 0.1.x | Yes |
+| 1.4.x | Yes |
 
 ## Reporting a vulnerability
 
@@ -26,12 +26,14 @@ private filesystem paths from reports and attachments.
 
 ## Security boundaries
 
-Codex Usage Bar is designed to:
+Codex Monitor is designed to:
 
 - communicate only with a locally launched Codex app-server
 - avoid reading Codex authentication files
 - avoid browser cookies
 - avoid persisting access tokens
 - treat app-server responses as untrusted input
+- keep iPhone OAuth credentials in a ThisDeviceOnly Keychain group
+- send only rendered pixels, never account data, to the BLE display
 
 Changes that weaken these boundaries require explicit security review.

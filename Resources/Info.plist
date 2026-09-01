@@ -11,9 +11,9 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Codex Usage Bar</string>
+	<string>Codex Monitor</string>
 	<key>CFBundleDisplayName</key>
-	<string>Codex Usage Bar</string>
+	<string>Codex Monitor</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon.icns</string>
 	<key>CFBundlePackageType</key>
@@ -23,9 +23,9 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Codex Usage Bar $(MARKETING_VERSION)</string>
+	<string>Codex Monitor $(MARKETING_VERSION)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 CMMUU. Released under the MIT License.</string>
+	<string>Codex Monitor contributors. Based on CMMUU/codex-usage-bar (MIT).</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
@@ -36,17 +36,9 @@
 	<string>$(APP_GROUP_IDENTIFIER)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Codex Monitor uses Bluetooth to discover and update your NRF_EPD display.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
-	<key>SUEnableAutomaticChecks</key>
-	<false/>
-	<key>SUFeedURL</key>
-	<string>https://github.com/CMMUU/codex-usage-bar/releases/latest/download/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>tdXqlQs0f8vhyDTjZvW7/yQp7d7e1zxyN1EpWoGc+70=</string>
-	<key>SURequireSignedFeed</key>
-	<true/>
-	<key>SUVerifyUpdateBeforeExtraction</key>
-	<true/>
 </dict>
 </plist>

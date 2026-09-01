@@ -11,8 +11,8 @@ extension AppLanguage {
 
   public var widgetWaitingBody: String {
     self == .simplifiedChinese
-      ? "打开 Codex Usage Bar 完成首次刷新"
-      : "Open Codex Usage Bar to complete the first refresh"
+      ? "打开 Codex Monitor 完成首次刷新"
+      : "Open Codex Monitor to complete the first refresh"
   }
 
   public var widgetStaleHelp: String {

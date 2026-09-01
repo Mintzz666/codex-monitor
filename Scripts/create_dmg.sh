@@ -2,11 +2,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="Codex Usage Bar"
-VERSION="${VERSION:-0.3.4}"
+APP_NAME="Codex Monitor"
+VERSION="${VERSION:-1.4.2}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 APP_DIR="$ROOT/dist/$APP_NAME.app"
-DMG_PATH="$ROOT/dist/Codex-Usage-Bar-v$VERSION-universal.dmg"
+DMG_PATH="$ROOT/dist/Codex-Monitor-v$VERSION-universal.dmg"
 
 if [[ ! -d "$APP_DIR" ]]; then
   printf 'Missing app bundle: %s\n' "$APP_DIR" >&2

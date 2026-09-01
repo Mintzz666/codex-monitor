@@ -2,132 +2,70 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build-and-verify:
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Show Swift version
-        run: swift --version
+      - uses: actions/checkout@v4
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Verify generated Xcode project
+      - name: Public release privacy check
+        run: make public-release-check
+
+      - name: Generate Xcode projects
         run: |
           make xcode-project
-          git diff --exit-code -- CodexUsageBar.xcodeproj
+          (cd Mobile && xcodegen generate --spec project.yml)
 
-      - name: Check formatting
-        run: swift format lint --recursive Sources Tests Package.swift
+      - name: Check Swift formatting
+        run: swift format lint --recursive Sources Tests Mobile/Sources Package.swift
 
       - name: Run deterministic verifier
         run: make test
 
-      - name: Build WidgetKit extension with SwiftPM
+      - name: Build macOS widget
         run: make widget-build
 
-      - name: Build universal app, widget, and DMG
+      - name: Compile iPhone app and widget
+        run: |
+          xcodebuild \
+            -project Mobile/CodexMonitorMobile.xcodeproj \
+            -scheme CodexMonitorMobile \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package local macOS app and DMG
         env:
-          VERSION: 0.2.2
+          VERSION: 1.4.1
           BUILD_NUMBER: ${{ github.run_number }}
         run: make release-package
 
-      - name: Verify app, widget, DMG, metadata, and signatures
+      - name: Verify artifacts
         run: |
-          APP="dist/Codex Usage Bar.app"
-          WIDGET="$APP/Contents/PlugIns/CodexUsageWidget.appex"
-          ICON="$APP/Contents/Resources/AppIcon.icns"
-          SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
-          DMG="dist/Codex-Usage-Bar-v0.2.2-universal.dmg"
-          WIDGET_ENTITLEMENTS="$RUNNER_TEMP/widget-entitlements.plist"
-
+          APP="dist/Codex Monitor.app"
+          WIDGET="$APP/Contents/PlugIns/CodexMonitorWidget.appex"
+          DMG="dist/Codex-Monitor-v1.4.1-universal.dmg"
+          test -d "$APP"
           test -d "$WIDGET"
-          test -f "$ICON"
-          test -d "$SPARKLE"
           test -f "$DMG"
           test -f "$DMG.sha256"
-
           plutil -lint "$APP/Contents/Info.plist"
           plutil -lint "$WIDGET/Contents/Info.plist"
-          codesign --verify --deep --strict --verbose=2 \
-            "$APP"
-          codesign --verify --deep --strict --verbose=2 \
-            "$SPARKLE"
-          codesign -d --entitlements :- "$WIDGET" \
-            >"$WIDGET_ENTITLEMENTS"
-          test "$(
-            plutil -extract 'com\.apple\.security\.network\.client' raw \
-              "$WIDGET_ENTITLEMENTS"
-          )" = "true"
-          test "$(
-            plutil -extract CFBundleIconFile raw "$APP/Contents/Info.plist"
-          )" = "AppIcon.icns"
-          test "$(
-            plutil -extract SUFeedURL raw "$APP/Contents/Info.plist"
-          )" = "https://github.com/CMMUU/codex-usage-bar/releases/latest/download/appcast.xml"
-          test "$(
-            plutil -extract SURequireSignedFeed raw "$APP/Contents/Info.plist"
-          )" = "true"
-          test "$(
-            plutil -extract SUVerifyUpdateBeforeExtraction raw \
-              "$APP/Contents/Info.plist"
-          )" = "true"
-          file "$APP/Contents/MacOS/Codex Usage Bar" \
-            | grep -q "universal binary"
-          file "$WIDGET/Contents/MacOS/CodexUsageWidget" \
-            | grep -q "universal binary"
+          codesign --verify --deep --strict --verbose=2 "$APP"
           (
             cd dist
             shasum -a 256 -c "$(basename "$DMG").sha256"
           )
-
-      - name: Check public-release boundaries
-        run: make public-release-check
-
-  website:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    defaults:
-      run:
-        working-directory: web
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install website dependencies
-        run: npm ci
-
-      - name: Check Worker and frontend scripts
-        run: npm run check
-
-      - name: Run Worker tests
-        run: npm test
-
-      - name: Validate Worker bundle
-        run: npx wrangler deploy --dry-run

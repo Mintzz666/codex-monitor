@@ -30,6 +30,24 @@ public struct RateLimitsReadResult: Decodable, Sendable {
   let rateLimitsByLimitId: [String: CodexRateLimitSnapshot]?
 }
 
+struct AccountUsageReadResult: Decodable, Sendable {
+  let summary: AccountUsageSummary?
+  let dailyUsageBuckets: [AccountDailyUsageBucket]?
+}
+
+struct AccountUsageSummary: Decodable, Sendable {
+  let lifetimeTokens: Int64?
+  let peakDailyTokens: Int64?
+  let longestRunningTurnSec: Int64?
+  let currentStreakDays: Int?
+  let longestStreakDays: Int?
+}
+
+struct AccountDailyUsageBucket: Decodable, Sendable {
+  let startDate: String
+  let tokens: Int64
+}
+
 struct CodexRateLimitSnapshot: Decodable, Sendable {
   let limitId: String?
   let limitName: String?
@@ -71,8 +89,8 @@ struct CodexRateLimitWindow: Decodable, Sendable {
   }
 }
 
-private extension KeyedDecodingContainer {
-  func decodeFlexibleDouble(forKey key: Key) throws -> Double? {
+extension KeyedDecodingContainer {
+  fileprivate func decodeFlexibleDouble(forKey key: Key) throws -> Double? {
     do {
       return try decodeIfPresent(Double.self, forKey: key)
     } catch {
@@ -81,7 +99,7 @@ private extension KeyedDecodingContainer {
     }
   }
 
-  func decodeFlexibleInt(forKey key: Key) throws -> Int? {
+  fileprivate func decodeFlexibleInt(forKey key: Key) throws -> Int? {
     do {
       return try decodeIfPresent(Int.self, forKey: key)
     } catch {
@@ -100,7 +118,7 @@ private extension KeyedDecodingContainer {
     }
   }
 
-  func decodeFlexibleInt64(forKey key: Key) throws -> Int64? {
+  fileprivate func decodeFlexibleInt64(forKey key: Key) throws -> Int64? {
     do {
       return try decodeIfPresent(Int64.self, forKey: key)
     } catch {
@@ -124,23 +142,87 @@ private extension KeyedDecodingContainer {
   }
 }
 
-public struct UsageSubWindow: Sendable, Equatable {
+public struct UsageWindow: Sendable, Equatable, Identifiable {
+  public let id: String
+  public let label: String?
   public let usedPercent: Double
   public let windowDurationMinutes: Int
   public let resetsAt: Date?
 
   public init(
+    id: String,
+    label: String?,
     usedPercent: Double,
     windowDurationMinutes: Int,
     resetsAt: Date?
   ) {
-    self.usedPercent = usedPercent
+    self.id = id
+    self.label = label
+    self.usedPercent = min(100, max(0, usedPercent))
     self.windowDurationMinutes = windowDurationMinutes
     self.resetsAt = resetsAt
   }
 
-  public var remainingPercent: Double {
-    max(0, 100 - usedPercent)
+  public var remainingPercent: Double { max(0, 100 - usedPercent) }
+}
+
+public struct DailyTokenUsage: Sendable, Equatable, Identifiable {
+  public let startDate: String
+  public let tokens: Int64
+
+  public init(startDate: String, tokens: Int64) {
+    self.startDate = startDate
+    self.tokens = max(0, tokens)
+  }
+
+  public var id: String { startDate }
+}
+
+public enum DailyTokenSeries {
+  public static func sevenDaysEnding(
+    on date: Date,
+    buckets: [DailyTokenUsage],
+    timeZone: TimeZone = .current
+  ) -> [DailyTokenUsage] {
+    var valuesByDate: [String: Int64] = [:]
+    for bucket in buckets {
+      valuesByDate[bucket.startDate, default: 0] += bucket.tokens
+    }
+
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+
+    let formatter = DateFormatter()
+    formatter.calendar = calendar
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = timeZone
+    formatter.dateFormat = "yyyy-MM-dd"
+
+    return (-6...0).compactMap { offset in
+      guard let day = calendar.date(byAdding: .day, value: offset, to: date)
+      else { return nil }
+      let key = formatter.string(from: day)
+      return DailyTokenUsage(startDate: key, tokens: valuesByDate[key] ?? 0)
+    }
+  }
+}
+
+public struct TokenUsage: Sendable, Equatable {
+  public let lifetimeTokens: Int64?
+  public let peakDailyTokens: Int64?
+  public let currentStreakDays: Int?
+  public let dailyBuckets: [DailyTokenUsage]
+
+  public init(
+    lifetimeTokens: Int64?,
+    peakDailyTokens: Int64?,
+    currentStreakDays: Int?,
+    dailyBuckets: [DailyTokenUsage]
+  ) {
+    self.lifetimeTokens = lifetimeTokens
+    self.peakDailyTokens = peakDailyTokens
+    self.currentStreakDays = currentStreakDays
+    self.dailyBuckets = dailyBuckets
   }
 }
 
@@ -151,7 +233,8 @@ public struct UsageSnapshot: Sendable, Equatable {
   public let planType: String?
   public let limitName: String?
   public let reachedLimitType: String?
-  public let fiveHourWindow: UsageSubWindow?
+  public let additionalWindows: [UsageWindow]
+  public let tokenUsage: TokenUsage?
 
   public init(
     usedPercent: Double,
@@ -160,7 +243,8 @@ public struct UsageSnapshot: Sendable, Equatable {
     planType: String?,
     limitName: String?,
     reachedLimitType: String?,
-    fiveHourWindow: UsageSubWindow? = nil
+    additionalWindows: [UsageWindow] = [],
+    tokenUsage: TokenUsage? = nil
   ) {
     self.usedPercent = usedPercent
     self.windowDurationMinutes = windowDurationMinutes
@@ -168,11 +252,25 @@ public struct UsageSnapshot: Sendable, Equatable {
     self.planType = planType
     self.limitName = limitName
     self.reachedLimitType = reachedLimitType
-    self.fiveHourWindow = fiveHourWindow
+    self.additionalWindows = additionalWindows
+    self.tokenUsage = tokenUsage
   }
 
   public var remainingPercent: Double {
     max(0, 100 - usedPercent)
+  }
+
+  public func attaching(tokenUsage: TokenUsage?) -> UsageSnapshot {
+    UsageSnapshot(
+      usedPercent: usedPercent,
+      windowDurationMinutes: windowDurationMinutes,
+      resetsAt: resetsAt,
+      planType: planType,
+      limitName: limitName,
+      reachedLimitType: reachedLimitType,
+      additionalWindows: additionalWindows,
+      tokenUsage: tokenUsage
+    )
   }
 }
 
@@ -196,8 +294,6 @@ public enum UsageSelectionError: LocalizedError, Equatable {
 public enum WeeklyUsageSelector {
   private static let weeklyWindowMinutes = 7 * 24 * 60
   private static let acceptedWindowRange = (6 * 24 * 60)...(8 * 24 * 60)
-  private static let fiveHourWindowMinutes = 5 * 60
-  private static let fiveHourWindowRange = (4 * 60)...(6 * 60)
 
   private struct Candidate {
     let snapshot: CodexRateLimitSnapshot
@@ -258,52 +354,46 @@ public enum WeeklyUsageSelector {
       usedPercent: min(100, max(0, rawUsedPercent)),
       windowDurationMinutes: duration,
       resetsAt: resetsAt,
-      planType: selected.snapshot.planType ?? accountPlanType,
+      planType: accountPlanType ?? selected.snapshot.planType,
       limitName: selected.sourceName,
       reachedLimitType: selected.snapshot.rateLimitReachedType,
-      fiveHourWindow: selectFiveHourWindow(from: candidates)
+      additionalWindows: selectAdditionalWindows(
+        from: candidates,
+        matchingLimitID: selected.snapshot.limitId
+      )
     )
   }
 
-  private static func selectFiveHourWindow(
-    from candidates: [Candidate]
-  ) -> UsageSubWindow? {
-    let fiveHourCandidates = candidates.filter {
-      guard let duration = $0.window.windowDurationMins,
-        $0.window.usedPercent != nil
+  private static func selectAdditionalWindows(
+    from candidates: [Candidate],
+    matchingLimitID: String?
+  ) -> [UsageWindow] {
+    var seen = Set<String>()
+    return candidates.compactMap { candidate in
+      guard
+        candidate.snapshot.limitId == matchingLimitID,
+        let duration = candidate.window.windowDurationMins,
+        !acceptedWindowRange.contains(duration),
+        let usedPercent = candidate.window.usedPercent
       else {
-        return false
+        return nil
       }
-      return fiveHourWindowRange.contains(duration)
-    }
 
-    guard let selected = fiveHourCandidates.min(by: fiveHourSort),
-      let rawUsedPercent = selected.window.usedPercent
-    else {
-      return nil
-    }
+      let reset = candidate.window.resetsAt ?? 0
+      let key = "\(duration)-\(usedPercent)-\(reset)"
+      guard seen.insert(key).inserted else { return nil }
 
-    return UsageSubWindow(
-      usedPercent: min(100, max(0, rawUsedPercent)),
-      windowDurationMinutes: selected.window.windowDurationMins
-        ?? fiveHourWindowMinutes,
-      resetsAt: selected.window.resetsAt.map {
-        Date(timeIntervalSince1970: TimeInterval($0))
-      }
-    )
-  }
-
-  private static func fiveHourSort(_ lhs: Candidate, _ rhs: Candidate) -> Bool {
-    let leftDistance = abs(
-      (lhs.window.windowDurationMins ?? 0) - fiveHourWindowMinutes
-    )
-    let rightDistance = abs(
-      (rhs.window.windowDurationMins ?? 0) - fiveHourWindowMinutes
-    )
-    if leftDistance != rightDistance {
-      return leftDistance < rightDistance
+      return UsageWindow(
+        id: "\(candidate.sourceName ?? "window")-\(duration)-\(reset)",
+        label: candidate.sourceName,
+        usedPercent: usedPercent,
+        windowDurationMinutes: duration,
+        resetsAt: candidate.window.resetsAt.map {
+          Date(timeIntervalSince1970: TimeInterval($0))
+        }
+      )
     }
-    return lhs.sourcePriority < rhs.sourcePriority
+    .sorted { $0.windowDurationMinutes < $1.windowDurationMinutes }
   }
 
   private static func appendWindows(

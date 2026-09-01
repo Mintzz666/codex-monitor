@@ -1,192 +1,118 @@
-# Codex Usage Bar — macOS Codex 用量菜单栏与小组件
+# Codex Monitor
 
-> **保持开发心流，从 Mac 菜单栏和小组件随时掌握 Codex 周用量。**
-
-[![CI](https://github.com/CMMUU/codex-usage-bar/actions/workflows/ci.yml/badge.svg)](https://github.com/CMMUU/codex-usage-bar/actions/workflows/ci.yml)
-[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple)](https://support.apple.com/macos)
-[![Swift](https://img.shields.io/badge/Swift-5_Mode-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-[项目官网](https://codex.cmmuu.com/) ·
-[最新版本](https://github.com/CMMUU/codex-usage-bar/releases/latest) ·
 [English](README.md)
 
-Codex Usage Bar 是一款免费、开源、原生的 macOS 菜单栏应用和 WidgetKit
-小组件，用于查看 Codex 周用量、剩余额度与重置时间。无需再打开 Codex
-账户菜单并进入 **Remaining usage**，抬眼就能确认当前限额状态，同时不读取或保存认证令牌。
+Codex Monitor 是一个非官方、本地优先的 Codex 用量看板。同一仓库包含三套
+可以独立使用的界面：
 
-## 产品预览
+- 原生 macOS 菜单栏应用，以及中型/大型 WidgetKit 小组件；
+- iPhone App，以及带手动刷新按钮的小型 WidgetKit 小组件；
+- 面向 `NRF_EPD_8042` 的 400 × 300 黑白红三色蓝牙墨水屏看板。
 
-### 菜单栏应用
+![macOS 菜单](docs/images/usage-popover.png)
 
-| English | 简体中文 |
-| --- | --- |
-| <img src="docs/images/menu-bar-app-en.png" alt="Codex Usage Bar 英文版 macOS 菜单栏应用，显示 Codex 周用量、剩余额度、重置时间和更新提示" /> | <img src="docs/images/menu-bar-app-zh-CN.png" alt="Codex Usage Bar 简体中文版 macOS 菜单栏应用，显示 Codex 周用量、剩余额度、重置时间和更新提示" /> |
+![墨水屏画面](docs/images/epd-live-preview.png)
 
-### macOS 小组件
+## 包含内容
 
-| English | 简体中文 |
-| --- | --- |
-| <img src="docs/images/widgets-en.png" alt="Codex Usage Bar 英文版小号和中号 WidgetKit 小组件，可用于 macOS 桌面和通知中心" /> | <img src="docs/images/widgets-zh-CN.png" alt="Codex Usage Bar 简体中文版小号和中号 WidgetKit 小组件，可用于 macOS 桌面和通知中心" /> |
+| 组件 | 数据来源 | 默认刷新策略 |
+|---|---|---|
+| macOS 菜单 | 本机启动的 `codex app-server` | 每分钟 |
+| macOS 小组件 | App Group 内的脱敏快照；临时签名构建可回退到本机回环 | WidgetKit 时间线 |
+| iPhone 小组件 | 独立的 OpenAI 设备授权与账户用量请求 | 每 15 分钟 + 手动按钮 |
+| 蓝牙墨水屏 | macOS 应用生成的黑/红位图 | 每小时检查，跨日立即检查 |
 
-## 功能
+墨水屏采用短连接：先比较稳定的画面哈希，内容没有变化时完全不启动蓝牙；
+需要更新时执行“连接 → 发送 → 断开”。连接或写入失败会自动重试一次。
 
-- 菜单栏直接显示 Codex 本周已用比例
-- 支持 K3（Kimi for Coding）5 小时窗口额度，可在弹窗下拉框切换订阅，Widget 同步显示
-- 弹窗显示剩余额度和下次重置时间
-- 显示当前套餐和限额名称
-- 每五分钟自动刷新
-- 支持手动刷新
-- 支持在弹窗内提示新版本并一键安全更新
-- 支持登录时启动
-- 支持在弹窗内切换简体中文和英文，Widget 同步切换并记住用户选择
-- 原生 SwiftUI 菜单栏界面
-- 原生 WidgetKit 小组件，可添加到桌面和通知中心
-- 支持小号、中号布局和数据过期提示
-- Codex 数据：不读取浏览器 Cookie，不复制 OAuth Token，不直接读取认证文件
-- K3 数据：仅读取本机 kimi-code 凭证文件，令牌原地自动刷新，不离开本机
+## 快速开始
 
-## 环境要求
+### macOS 应用
 
-- macOS 13 Ventura 或更高版本
-- 本机已经安装 Codex
-- Codex 已登录能够返回使用限额的 ChatGPT 账号
-- 从源码构建需要 Swift 6.3 工具链
+1. 从 [Releases](https://github.com/Mintzz666/codex-monitor/releases) 下载 DMG。
+2. 将 **Codex Monitor** 拖入 `/Applications`。
+3. 确认官方 Codex CLI/App 已安装并登录。
+4. 启动 Codex Monitor；应用会读取本机数据并默认注册登录时启动。
 
-仅使用 API Key 或本地模型的会话可能不会返回 ChatGPT 账号限额。
+社区构建默认使用临时签名。若 Gatekeeper 阻止首次启动，可以右键应用选择
+**打开**，或按文档自行从源码构建。
 
-## 安装
+### iPhone App 与小组件
 
-从 [GitHub Releases](https://github.com/CMMUU/codex-usage-bar/releases/latest)
-下载最新的 Universal DMG，打开后将 **Codex Usage Bar** 拖入
-**Applications**。
+iPhone 目标需要使用你自己的 Apple Development Team 构建。先将示例 Bundle
+ID、App Group 和 Keychain Group 改成你自己的唯一标识，再打开
+`Mobile/CodexMonitorMobile.xcodeproj`，安装到真机、完成设备授权，最后添加
+**Codex Monitor** 小型组件。
 
-当前 GitHub 版本使用 ad-hoc 签名。首次启动如果被 macOS 阻止，请打开
-**系统设置 → 隐私与安全性**，点击**仍要打开**。确认一次后即可正常启动。
+详见：[iPhone 复现指南](docs/setup-ios.md)。
 
-首次启动并刷新成功后，可以从 macOS 小组件库将 **Codex 周限额** 添加到桌面或通知中心。
+### 蓝牙墨水屏
 
-从 v0.2.1 开始，后续版本可以直接通过菜单栏弹窗内的更新按钮安装。更新包和
-appcast 均使用 Sparkle EdDSA 签名验证。
+给 `NRF_EPD_8042` 4.2 英寸 400 × 300 黑白红墨水屏供电，并放在 Mac
+蓝牙范围内。允许 Codex Monitor 使用蓝牙后，程序可以自动发现设备；
+“检测”只读取硬件信息，“立即同步”可手动触发一次数据检查。
 
-每个版本同时提供 `.sha256` 校验文件：
-
-```bash
-shasum -a 256 -c Codex-Usage-Bar-vX.Y.Z-universal.dmg.sha256
-```
+详见：[墨水屏硬件与协议指南](docs/setup-epd.md)。
 
 ## 从源码构建
 
-```bash
-git clone https://github.com/CMMUU/codex-usage-bar.git
-cd codex-usage-bar
-brew install xcodegen
-make package
-open "dist/Codex Usage Bar.app"
-```
+需要：
 
-应用产物位于：
+- macOS 13 或更高版本；
+- 完整 Xcode，以及支持 Swift 6.3 的工具链；
+- 运行真实 macOS 数据测试时，需要官方 Codex CLI/App；
+- 只有重新生成已检入的 Xcode 工程时才需要 XcodeGen。
 
-```text
-dist/Codex Usage Bar.app
-```
+```sh
+git clone https://github.com/Mintzz666/codex-monitor.git
+cd codex-monitor
 
-未提供 Apple 凭证时，本地构建和 GitHub Release 使用 ad-hoc 签名。配置完整的
-Developer ID 与公证凭证后，发布流水线会自动启用 Apple 公证和 stapling。
-
-## 工作原理
-
-应用通过标准输入输出启动本机
-[`codex app-server`](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md)，
-并调用：
-
-- `account/read`
-- `account/rateLimits/read`
-
-应用根据 `windowDurationMins` 识别七天周限额窗口，而不是假设某个固定字段始终代表周限额。
-
-```mermaid
-flowchart LR
-    A["Codex Usage Bar"] --> B["本机 codex app-server"]
-    B --> C["account/read"]
-    B --> D["account/rateLimits/read"]
-    D --> E["识别七天窗口"]
-    E --> F["SwiftUI 菜单栏"]
-    F --> G["App Group 或本机回环快照"]
-    G --> H["WidgetKit 时间线"]
-```
-
-Codex 可执行文件按以下顺序查找：
-
-1. `CODEX_BINARY_PATH`
-2. ChatGPT macOS 应用内置的 Codex
-3. Homebrew 和常见用户级可执行目录
-4. 当前 `PATH`
-
-## 隐私
-
-Codex Usage Bar：
-
-- 不读取 `~/.codex/auth.json`
-- 不复制或持久化访问令牌
-- 不读取浏览器 Cookie
-- 不发送分析数据
-- 不直接调用未公开的 ChatGPT HTTP 接口
-- Widget 降级通道仅监听本机回环接口
-
-Codex 数据的认证和令牌刷新由本机 Codex app-server 负责。K3 数据则读取并原地刷新
-`~/.kimi-code/credentials/kimi-code.json` 中的 kimi-code OAuth 凭证（原子写入、0600 权限），
-仅访问 `auth.kimi.com` 与 `api.kimi.com`，令牌不写入日志、不发送至其他服务器。应用只把标准化后的用量比例、
-重置时间、套餐名称和更新时间写入应用私有的 App Group；在 ad-hoc 版本中，
-Widget 通过本机回环接口读取相同的脱敏快照，不传输认证信息。
-
-## 开发与验证
-
-```bash
-make build
 make test
-make integration-test
-make widget-build
-make xcode-project
 make package
-make release-package
-make docs-screenshot
-make public-release-check
-make web-check
-make web-deploy
+make dmg
 ```
 
-验证器覆盖：
+使用 Apple Development Team 签名前，请把
+`com.example.codexmonitor` 和 `group.com.example.codexmonitor`
+全部替换成属于你团队的唯一标识，然后重新生成工程：
 
-- Primary 和 Secondary 限额窗口
-- `rateLimitsByLimitId` 兜底
-- 周窗口识别
-- 异常百分比边界
-- Codex 路径覆盖
-- 小组件共享快照持久化和过期判断
-- 可选的本机实时集成测试
+```sh
+brew install xcodegen
+make xcode-project
+(cd Mobile && xcodegen generate --spec project.yml)
+```
 
-官网位于 `web/`，由 Cloudflare Worker 提供静态页面和 GitHub
-Release 查询接口。下载按钮始终指向 GitHub，不在 Cloudflare 保存安装包。
+完整步骤：[macOS 构建指南](docs/setup-macos.md)。
 
-## 参与贡献
+## 数据与隐私
 
-欢迎提交 Issue 和 Pull Request。提交前请阅读
-[CONTRIBUTING.md](CONTRIBUTING.md)。
+macOS 端只启动本机已经安装的 `codex app-server`，调用 `account/read`、
+`account/rateLimits/read` 和 `account/usage/read`。登录与令牌刷新仍由 Codex
+负责；本应用不读取浏览器 Cookie，也不复制 Codex 凭据。
 
-安全问题请按照 [SECURITY.md](SECURITY.md) 私下报告，不要创建公开 Issue。
+iPhone 端独立登录。OAuth 凭据只保存在 App 与小组件共享的 iOS Keychain
+Group；App Group 只保存不敏感的额度快照。手机端接口跟随官方开源 Codex
+实现，但它不是单独面向第三方发布的稳定 API，未来可能需要跟随上游调整。
 
-## 路线图
+项目不包含统计分析、广告 SDK、云数据库或开发者运营的后端服务。
+详见：[架构、数据流与隐私](docs/architecture-and-privacy.md)。
 
-- 可选的短周期用量显示
-- 改进多账号和多限额展示
-- 自定义刷新间隔
+## 复现文档
 
-## 许可证
+- [macOS 应用和小组件](docs/setup-macos.md)
+- [iPhone App 和小组件](docs/setup-ios.md)
+- [蓝牙墨水屏看板](docs/setup-epd.md)
+- [架构、数据流与隐私](docs/architecture-and-privacy.md)
+- [发布流程](docs/releasing.md)
+- [参与贡献](CONTRIBUTING.md)
+- [安全策略](SECURITY.md)
 
-[MIT](LICENSE)
+## 许可与归属
 
-## 免责声明
+项目使用 MIT 协议，基于
+[`CMMUU/codex-usage-bar`](https://github.com/CMMUU/codex-usage-bar) 改造。
+原项目版权和 MIT 条款保留在 [LICENSE](LICENSE)，其他说明见
+[NOTICE.md](NOTICE.md)。
 
-Codex Usage Bar 是独立的非官方社区项目，与 OpenAI
-不存在隶属、认可或赞助关系。Codex 和 OpenAI 商标归其各自权利人所有。
+Codex、ChatGPT、OpenAI、Apple、iPhone 及相关硬件名称归各自权利人所有。
+本项目是社区项目，与 OpenAI、Apple 或硬件厂商不存在隶属或背书关系。

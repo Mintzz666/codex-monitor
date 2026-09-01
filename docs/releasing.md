@@ -1,91 +1,79 @@
-# Release process
+# Public release process
 
-Production releases are built by `.github/workflows/release.yml` from semantic
-version tags such as `v0.2.0`.
+This repository publishes source plus a universal macOS DMG. The iPhone target
+is distributed as source because Apple signing belongs to each installer.
 
-## Signing modes
+## 1. Update versions
 
-The workflow defaults to an ad-hoc signature and does not require an Apple
-Developer account. If all six secrets below are configured, it automatically
-switches to Developer ID signing and Apple notarization.
+Keep these values aligned:
 
-## Optional GitHub Actions secrets
+- `project.yml`: `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`
+- checked-in macOS Xcode project
+- `Scripts/package.sh`
+- `Scripts/create_dmg.sh`
+- `Scripts/release_package.sh`
+- `Scripts/notarize.sh`
 
-| Secret | Content |
-| --- | --- |
-| `APPLE_DEVELOPER_ID_CERTIFICATE_BASE64` | Base64-encoded Developer ID Application `.p12` |
-| `APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD` | Password used when exporting the `.p12` |
-| `APPLE_TEAM_ID` | Ten-character Apple Developer Team ID |
-| `APPLE_NOTARY_KEY_BASE64` | Base64-encoded App Store Connect API `.p8` key |
-| `APPLE_NOTARY_KEY_ID` | App Store Connect API key ID |
-| `APPLE_NOTARY_ISSUER_ID` | App Store Connect API issuer ID |
+Regenerate the project with XcodeGen when available.
 
-Configure either all six secrets or none of them. A partial configuration stops
-the release before building. The workflow never writes credentials to the
-repository or a release asset. It imports the certificate into a temporary CI
-keychain and the hosted runner is discarded after the job.
+## 2. Privacy and verification
 
-In Developer ID mode, the app and widget use the macOS-only, non-provisioned
-App Group identifier:
-
-```text
-<APPLE_TEAM_ID>.io.cmmuu.codex-usage-bar
+```sh
+make public-release-check
+make test
+make integration-test
 ```
 
-macOS validates that the Team ID in this identifier matches the Team ID in both
-code signatures. Apple documents this format in
-[Accessing app group containers in your existing macOS app](https://developer.apple.com/documentation/xcode/accessing-app-group-containers).
+The integration check is optional in CI but expected before a manual release on
+a Mac with a signed-in Codex installation.
 
-Ad-hoc builds retain the default `group.io.cmmuu.codex-usage-bar` entitlement.
-The menu bar app runs after the one-time Gatekeeper confirmation, while App
-Group data sharing with the widget can require additional authorization on
-macOS 15 and later.
+Inspect every changed screenshot. Do not publish real account IDs, OAuth codes,
+access/refresh tokens, private paths, Bluetooth UUIDs unique to a device, Apple
+Team IDs, provisioning profiles, or personal email addresses.
 
-## Required Sparkle signing secret
+## 3. Build artifacts
 
-Automatic updates use a separate EdDSA key and do not require an Apple
-Developer account.
-
-| Secret | Content |
-| --- | --- |
-| `SPARKLE_EDDSA_PRIVATE_KEY` | Private key exported by Sparkle `generate_keys -x` |
-
-The matching public key is embedded in `Resources/Info.plist`. The private key
-must only exist in the maintainer's macOS Keychain, an offline backup, and the
-GitHub Actions secret. Never add it to the repository, logs, release notes, or
-workflow arguments.
-
-Each release signs both the DMG enclosure and the appcast. The resulting
-`appcast.xml` is uploaded to GitHub Releases and served through:
-
-```text
-https://github.com/CMMUU/codex-usage-bar/releases/latest/download/appcast.xml
+```sh
+VERSION=1.4.2 BUILD_NUMBER=38 make release-package
 ```
 
-## Publish
+This creates:
 
-1. Update `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml`.
-2. Add `docs/release-notes/vX.Y.Z.md`.
-3. Run the local checks:
+- `dist/Codex Monitor.app`
+- `dist/Codex-Monitor-v1.4.2-universal.dmg`
+- `dist/Codex-Monitor-v1.4.2-universal.dmg.sha256`
 
-   ```bash
-   make test
-   make widget-build
-   make web-check
-   make public-release-check
-   ```
+Without signing environment variables, the output is ad-hoc signed. Optional
+notarization runs only when `APPLE_NOTARY_KEY_BASE64` and the related notary
+configuration are supplied by the release environment. Never store those
+credentials in the repository.
 
-4. Push the commit and wait for CI.
-5. Create and push the annotated tag:
+Verify the checksum:
 
-   ```bash
-   git tag -a vX.Y.Z -m "Codex Usage Bar vX.Y.Z"
-   git push origin vX.Y.Z
-   ```
+```sh
+cd dist
+shasum -a 256 -c Codex-Monitor-v1.4.2-universal.dmg.sha256
+```
 
-The release workflow builds a universal app, embeds and signs the WidgetKit
-extension and Sparkle framework, creates a DMG, generates a SHA-256 checksum,
-produces a signed Sparkle appcast and build attestation, and uploads the
-artifacts to the matching GitHub Release. Without Apple credentials it uses an
-ad-hoc signature. With all Apple credentials configured, it also submits the
-DMG for notarization and staples the ticket.
+## 4. Tag and GitHub Release
+
+The checked-in release workflow runs for tags matching `v*`, repeats the public
+release check and deterministic verifier, builds the DMG, and uploads the DMG
+and checksum to a GitHub Release.
+
+```sh
+git tag -a v1.4.2 -m "Codex Monitor 1.4.2"
+git push origin v1.4.2
+```
+
+For a manual release, use the text in `docs/release-notes/v1.4.2.md` and upload
+only the current DMG and its matching checksum.
+
+## 5. Post-release verification
+
+- Open the public repository in a signed-out browser.
+- Verify README images and all documentation links.
+- Download the release assets and verify SHA-256.
+- Confirm the source archive contains no ignored build or credential files.
+- Confirm the DMG reports the intended version and contains the widget.
+- Confirm the release states that the iPhone app requires local Apple signing.

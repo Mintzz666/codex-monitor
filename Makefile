@@ -1,4 +1,4 @@
-.PHONY: build test integration-test widget-build xcode-project package dmg release-package run docs-screenshot public-release-check web-check web-dev web-deploy clean
+.PHONY: build test integration-test widget-build xcode-project package dmg release-package public-release-check run docs-screenshot clean
 
 build:
 	swift build
@@ -24,23 +24,14 @@ dmg: package
 release-package:
 	./Scripts/release_package.sh
 
+public-release-check:
+	./Scripts/public_release_check.py
+
 run: package
-	open "dist/Codex Usage Bar.app"
+	open "dist/Codex Monitor.app"
 
 docs-screenshot:
 	./Scripts/render-documentation-snapshot.sh
-
-public-release-check:
-	python3 Scripts/public_release_check.py
-
-web-check:
-	cd web && npm run check && npm test && npx wrangler deploy --dry-run
-
-web-dev:
-	cd web && npm run dev
-
-web-deploy:
-	cd web && npm run deploy
 
 clean:
 	swift package clean

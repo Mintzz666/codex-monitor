@@ -3,13 +3,18 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if ! command -v xcodegen >/dev/null 2>&1; then
+cd "$ROOT"
+
+if command -v xcodegen >/dev/null 2>&1; then
+  xcodegen generate --spec project.yml
+elif [[ -d "$ROOT/CodexUsageBar.xcodeproj" ]]; then
   printf '%s\n' \
-    "XcodeGen is required to regenerate CodexUsageBar.xcodeproj." \
+    "XcodeGen is not installed; using the checked-in Xcode project." \
+    "Install XcodeGen only when project.yml needs to be regenerated."
+else
+  printf '%s\n' \
+    "CodexUsageBar.xcodeproj is missing and XcodeGen is not installed." \
     "Install it with: brew install xcodegen" \
     >&2
   exit 1
 fi
-
-cd "$ROOT"
-xcodegen generate --spec project.yml

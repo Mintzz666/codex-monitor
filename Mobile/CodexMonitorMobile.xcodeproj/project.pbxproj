@@ -1,0 +1,496 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0D37B75FCDE9D68E8B07FB13 /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = 61A1033B69BACB8C9320F659 /* AppIcon-1024.png */; };
+		1E7C03A29A3D836BD116FE3D /* CodexSmallWidgetCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA55F4E83A9C0AE922BC6D85 /* CodexSmallWidgetCard.swift */; };
+		4DF3A802C8B0C1220CE74F9B /* CodexMonitorMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F34B9CAC805B78F2743458F7 /* CodexMonitorMobileApp.swift */; };
+		62EBF59BEC03207EAAEDDF26 /* MobileUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D6496C263A106F7889407C /* MobileUsage.swift */; };
+		B6B0E9A30D9D4EBFEE1A71FE /* CodexSmallWidgetCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA55F4E83A9C0AE922BC6D85 /* CodexSmallWidgetCard.swift */; };
+		BE6F800BF0CC6EB7826BA95B /* MobileUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D6496C263A106F7889407C /* MobileUsage.swift */; };
+		C6DC372F88FF9F31514D15DE /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = 61A1033B69BACB8C9320F659 /* AppIcon-1024.png */; };
+		CA4841FAC0684BFC37B22709 /* CodexMonitorMobileWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 32BE5F997BFFDCDDBA98D462 /* CodexMonitorMobileWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F425402EB3162B7A6E458FC9 /* CodexMonitorMobileWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35814193CE88A32A90ABE8A1 /* CodexMonitorMobileWidget.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		00AB87C43EC2122983338404 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0402AF185661013FEB6824F7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C5B18DE168ED15D1B93FC45E;
+			remoteInfo = CodexMonitorMobileWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7D457E088F4458170D39AFB5 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CA4841FAC0684BFC37B22709 /* CodexMonitorMobileWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		32BE5F997BFFDCDDBA98D462 /* CodexMonitorMobileWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CodexMonitorMobileWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		35814193CE88A32A90ABE8A1 /* CodexMonitorMobileWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexMonitorMobileWidget.swift; sourceTree = "<group>"; };
+		4E933C367D3A6008986D2A7B /* Codex Monitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Codex Monitor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		61A1033B69BACB8C9320F659 /* AppIcon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIcon/AppIcon-1024.png; sourceTree = "<group>"; };
+		C0D6496C263A106F7889407C /* MobileUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileUsage.swift; sourceTree = "<group>"; };
+		CA55F4E83A9C0AE922BC6D85 /* CodexSmallWidgetCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexSmallWidgetCard.swift; sourceTree = "<group>"; };
+		F34B9CAC805B78F2743458F7 /* CodexMonitorMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexMonitorMobileApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0642B369D32F146D00A8E97E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4E933C367D3A6008986D2A7B /* Codex Monitor.app */,
+				32BE5F997BFFDCDDBA98D462 /* CodexMonitorMobileWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		45D80D18BD04BEFDC5178632 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				CA55F4E83A9C0AE922BC6D85 /* CodexSmallWidgetCard.swift */,
+				C0D6496C263A106F7889407C /* MobileUsage.swift */,
+			);
+			name = Shared;
+			path = Sources/Shared;
+			sourceTree = "<group>";
+		};
+		BE6ECDC16604060B87844273 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F34B9CAC805B78F2743458F7 /* CodexMonitorMobileApp.swift */,
+			);
+			name = App;
+			path = Sources/App;
+			sourceTree = "<group>";
+		};
+		CBDA138EEDDFE1924F477953 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				61A1033B69BACB8C9320F659 /* AppIcon-1024.png */,
+			);
+			name = Resources;
+			path = ../Resources;
+			sourceTree = "<group>";
+		};
+		CCA8056143DFC234C157DCBD = {
+			isa = PBXGroup;
+			children = (
+				BE6ECDC16604060B87844273 /* App */,
+				CBDA138EEDDFE1924F477953 /* Resources */,
+				45D80D18BD04BEFDC5178632 /* Shared */,
+				F39C5F8C31542AA2C1329146 /* Widget */,
+				0642B369D32F146D00A8E97E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F39C5F8C31542AA2C1329146 /* Widget */ = {
+			isa = PBXGroup;
+			children = (
+				35814193CE88A32A90ABE8A1 /* CodexMonitorMobileWidget.swift */,
+			);
+			name = Widget;
+			path = Sources/Widget;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		538D157E9E9E01844356B1A1 /* CodexMonitorMobile */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F870DFE8D10CAA63C940B151 /* Build configuration list for PBXNativeTarget "CodexMonitorMobile" */;
+			buildPhases = (
+				B48957ED2077FC75006C4482 /* Sources */,
+				5C3E7A32E508FC7A78367A66 /* Resources */,
+				7D457E088F4458170D39AFB5 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				399D6779A744096813A559CF /* PBXTargetDependency */,
+			);
+			name = CodexMonitorMobile;
+			packageProductDependencies = (
+			);
+			productName = CodexMonitorMobile;
+			productReference = 4E933C367D3A6008986D2A7B /* Codex Monitor.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C5B18DE168ED15D1B93FC45E /* CodexMonitorMobileWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 90F74010122F535E9082FDEF /* Build configuration list for PBXNativeTarget "CodexMonitorMobileWidget" */;
+			buildPhases = (
+				39C70ABA8BD20C3EE6D6D203 /* Sources */,
+				A50C35D2A46DABAAF193251F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CodexMonitorMobileWidget;
+			packageProductDependencies = (
+			);
+			productName = CodexMonitorMobileWidget;
+			productReference = 32BE5F997BFFDCDDBA98D462 /* CodexMonitorMobileWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0402AF185661013FEB6824F7 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					538D157E9E9E01844356B1A1 = {
+						ProvisioningStyle = Automatic;
+					};
+					C5B18DE168ED15D1B93FC45E = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 1FC658FF311D1CE2E25D269E /* Build configuration list for PBXProject "CodexMonitorMobile" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = CCA8056143DFC234C157DCBD;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 0642B369D32F146D00A8E97E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				538D157E9E9E01844356B1A1 /* CodexMonitorMobile */,
+				C5B18DE168ED15D1B93FC45E /* CodexMonitorMobileWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5C3E7A32E508FC7A78367A66 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0D37B75FCDE9D68E8B07FB13 /* AppIcon-1024.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A50C35D2A46DABAAF193251F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C6DC372F88FF9F31514D15DE /* AppIcon-1024.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		39C70ABA8BD20C3EE6D6D203 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F425402EB3162B7A6E458FC9 /* CodexMonitorMobileWidget.swift in Sources */,
+				1E7C03A29A3D836BD116FE3D /* CodexSmallWidgetCard.swift in Sources */,
+				BE6F800BF0CC6EB7826BA95B /* MobileUsage.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B48957ED2077FC75006C4482 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4DF3A802C8B0C1220CE74F9B /* CodexMonitorMobileApp.swift in Sources */,
+				B6B0E9A30D9D4EBFEE1A71FE /* CodexSmallWidgetCard.swift in Sources */,
+				62EBF59BEC03207EAAEDDF26 /* MobileUsage.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		399D6779A744096813A559CF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C5B18DE168ED15D1B93FC45E /* CodexMonitorMobileWidget */;
+			targetProxy = 00AB87C43EC2122983338404 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0B61E242FDC899DF0E73CBBE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/CodexMonitorMobile.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Codex Monitor";
+				INFOPLIST_KEY_CodexMonitorKeychainGroup = "$(AppIdentifierPrefix)com.example.codexmonitor.mobile.shared";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.codexmonitor.mobile";
+				PRODUCT_NAME = "Codex Monitor";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		4811BA2F4FAA8DCBCE7B1961 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Resources/CodexMonitorMobileWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/WidgetInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.codexmonitor.mobile.widget";
+				PRODUCT_NAME = CodexMonitorMobileWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		5817EFDB817579E6BDC4FBFA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APP_GROUP_IDENTIFIER = "group.com.example.codexmonitor.mobile";
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_LANGUAGE = "zh-Hans";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		61E0A3BA554D7C9F4D52076D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				APP_GROUP_IDENTIFIER = "group.com.example.codexmonitor.mobile";
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 2;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_LANGUAGE = "zh-Hans";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		B8DFCF6A3DEFFAC13460D890 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Resources/CodexMonitorMobileWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Resources/WidgetInfo.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.codexmonitor.mobile.widget";
+				PRODUCT_NAME = CodexMonitorMobileWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		D9A1DB2B2C75EF340F560B11 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/CodexMonitorMobile.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Codex Monitor";
+				INFOPLIST_KEY_CodexMonitorKeychainGroup = "$(AppIdentifierPrefix)com.example.codexmonitor.mobile.shared";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.example.codexmonitor.mobile";
+				PRODUCT_NAME = "Codex Monitor";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1FC658FF311D1CE2E25D269E /* Build configuration list for PBXProject "CodexMonitorMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5817EFDB817579E6BDC4FBFA /* Debug */,
+				61E0A3BA554D7C9F4D52076D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		90F74010122F535E9082FDEF /* Build configuration list for PBXNativeTarget "CodexMonitorMobileWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4811BA2F4FAA8DCBCE7B1961 /* Debug */,
+				B8DFCF6A3DEFFAC13460D890 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F870DFE8D10CAA63C940B151 /* Build configuration list for PBXNativeTarget "CodexMonitorMobile" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D9A1DB2B2C75EF340F560B11 /* Debug */,
+				0B61E242FDC899DF0E73CBBE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0402AF185661013FEB6824F7 /* Project object */;
+}

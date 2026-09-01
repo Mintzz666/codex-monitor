@@ -13,9 +13,6 @@ struct CodexUsageVerifier {
       if CommandLine.arguments.contains("--integration") {
         try await runIntegrationCheck()
       }
-      if CommandLine.arguments.contains("--kimi-integration") {
-        try await runKimiIntegrationCheck()
-      }
       print("验证完成：全部通过")
     } catch {
       fputs("验证失败：\(error.localizedDescription)\n", stderr)
@@ -81,17 +78,11 @@ struct CodexUsageVerifier {
       accountPlanType: "plus"
     )
     try expect(secondaryUsage.usedPercent == 61.5, "从 secondary 选择周窗口")
-    try expect(secondaryUsage.planType == "plus", "使用账号套餐兜底")
+    try expect(secondaryUsage.planType == "plus", "优先使用账号套餐")
     try expect(
-      secondaryUsage.fiveHourWindow?.usedPercent == 5,
-      "提取五小时限额窗口"
+      secondaryUsage.additionalWindows.first?.windowDurationMinutes == 300,
+      "把非周额度作为动态附加窗口"
     )
-    try expect(
-      secondaryUsage.fiveHourWindow?.resetsAt
-        == Date(timeIntervalSince1970: 1_000),
-      "五小时限额重置时间"
-    )
-    try expect(primaryUsage.fiveHourWindow == nil, "无五小时窗口时不展示")
 
     let mappedWeekly = try decodeRateLimits(
       """
@@ -156,151 +147,39 @@ struct CodexUsageVerifier {
 
     try verifyExecutableOverride()
     try verifySharedUsageStore()
-    try verifyKimiUsageMapping()
     try verifyAppLanguage()
+    try verifyDailyTokenSeries()
+    try verifyEPDTransportBoundary()
   }
 
-  private static func verifyKimiUsageMapping() throws {
-    let payload = """
-      {
-        "user": {
-          "userId": "u1",
-          "membership": { "level": "LEVEL_INTERMEDIATE" }
-        },
-        "usage": {
-          "limit": "100",
-          "used": "17",
-          "remaining": "83",
-          "resetTime": "2026-07-31T03:22:24.930601Z"
-        },
-        "limits": [
-          {
-            "window": { "duration": 300, "timeUnit": "TIME_UNIT_MINUTE" },
-            "detail": {
-              "limit": "100",
-              "used": "20",
-              "remaining": "80",
-              "resetTime": "2026-07-31T02:22:24.930601Z"
-            }
-          }
-        ]
-      }
-      """
-    let snapshot = try KimiUsageMapper.snapshot(from: Data(payload.utf8))
-    try expect(snapshot.usedPercent == 17, "K3 解析已用百分比")
-    try expect(snapshot.remainingPercent == 83, "K3 计算剩余额度")
-    try expect(snapshot.planType == "intermediate", "K3 映射套餐等级")
-    try expect(snapshot.limitName == "K3", "K3 设置限额名称")
-    try expect(snapshot.windowDurationMinutes == 0, "K3 主窗口时长未知")
-
-    let resetFormatter = ISO8601DateFormatter()
-    resetFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    try expect(
-      snapshot.resetsAt == resetFormatter.date(
-        from: "2026-07-31T03:22:24.930601Z"
-      ),
-      "K3 解析重置时间"
+  private static func verifyDailyTokenSeries() throws {
+    let utc = TimeZone(secondsFromGMT: 0)!
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = utc
+    let today = calendar.date(
+      from: DateComponents(year: 2026, month: 8, day: 30, hour: 12)
+    )!
+    let series = DailyTokenSeries.sevenDaysEnding(
+      on: today,
+      buckets: [
+        DailyTokenUsage(startDate: "2026-08-28", tokens: 120),
+        DailyTokenUsage(startDate: "2026-08-29", tokens: 200),
+        DailyTokenUsage(startDate: "2026-08-29", tokens: 30),
+      ],
+      timeZone: utc
     )
 
     try expect(
-      snapshot.fiveHourWindow?.usedPercent == 20,
-      "K3 提取五小时限额"
+      series.count == 7
+        && series.first?.startDate == "2026-08-24"
+        && series.last?.startDate == "2026-08-30",
+      "菜单 Token 折线固定以今天结束"
     )
     try expect(
-      snapshot.fiveHourWindow?.windowDurationMinutes == 300,
-      "K3 五小时窗口长度"
-    )
-    try expect(
-      snapshot.fiveHourWindow?.resetsAt
-        == resetFormatter.date(from: "2026-07-31T02:22:24.930601Z"),
-      "K3 五小时限额重置时间"
-    )
-
-    let remainingOnlyPayload = """
-      {
-        "user": { "membership": { "level": "LEVEL_INTERMEDIATE" } },
-        "usage": {
-          "limit": 100,
-          "remaining": 83,
-          "reset_time": "2026-07-31T03:22:24.930601Z"
-        },
-        "limits": [
-          {
-            "window": {
-              "duration": 300,
-              "time_unit": "TIME_UNIT_MINUTE"
-            },
-            "detail": {
-              "limit": 100,
-              "remaining": 80,
-              "reset_time": "2026-07-31T02:22:24.930601Z"
-            }
-          }
-        ]
-      }
-      """
-    let remainingOnly = try KimiUsageMapper.snapshot(
-      from: Data(remainingOnlyPayload.utf8)
-    )
-    try expect(
-      remainingOnly.usedPercent == 17
-        && remainingOnly.fiveHourWindow?.usedPercent == 20,
-      "K3 兼容 remaining-only 和 snake_case 响应"
-    )
-
-    let withoutLimits = try KimiUsageMapper.snapshot(
-      from: Data(
-        "{\"usage\":{\"limit\":\"100\",\"used\":\"17\"}}".utf8
-      )
-    )
-    try expect(
-      withoutLimits.fiveHourWindow == nil,
-      "K3 无 limits 字段时隐藏五小时限额"
-    )
-
-    let emptyLimits = try KimiUsageMapper.snapshot(
-      from: Data(
-        "{\"usage\":{\"limit\":\"100\",\"used\":\"17\"},\"limits\":[]}".utf8
-      )
-    )
-    try expect(
-      emptyLimits.fiveHourWindow == nil,
-      "K3 空 limits 数组时隐藏五小时限额"
-    )
-
-    do {
-      _ = try KimiUsageMapper.snapshot(
-        from: Data("{\"usage\":{\"limit\":\"0\",\"used\":\"1\"}}".utf8)
-      )
-      throw VerificationFailure("K3 拒绝无效额度数据")
-    } catch KimiUsageClientError.invalidResponse {
-      print("PASS K3 拒绝无效额度数据")
-    }
-
-    let credentials = try JSONDecoder().decode(
-      KimiCredentials.self,
-      from: Data(
-        "{\"access_token\":\"a\",\"refresh_token\":\"b\",\"expires_at\":4102444800}"
-          .utf8
-      )
-    )
-    try expect(
-      credentials.isAccessTokenValid(
-        at: Date(timeIntervalSince1970: 1_700_000_000)
-      ),
-      "K3 凭证在有效期内"
-    )
-    try expect(
-      !credentials.isAccessTokenValid(
-        at: Date(timeIntervalSince1970: 4_103_000_000)
-      ),
-      "K3 凭证过期识别"
-    )
-    try expect(
-      UsageSubscription.resolve("k3") == .k3
-        && UsageSubscription.resolve(nil) == .codex
-        && UsageSubscription.resolve("unknown") == .codex,
-      "订阅选择解析与兜底"
+      series[4].tokens == 120
+        && series[5].tokens == 230
+        && series[6].tokens == 0,
+      "菜单 Token 折线补齐缺失日期并合并重复桶"
     )
   }
 
@@ -342,6 +221,9 @@ struct CodexUsageVerifier {
           *account/rateLimits/read*)
             printf '%s\\n' '{"id":2,"result":{"rate_limits":{"limit_id":"codex","primary":{"used_percent":"12.5","window_duration_seconds":604800,"resets_at":1788138263}}}}'
             ;;
+          *account/usage/read*)
+            printf '%s\\n' '{"id":3,"result":{"summary":{"lifetimeTokens":123456},"dailyUsageBuckets":[{"startDate":"2026-08-27","tokens":12000}]}}'
+            ;;
         esac
       done
       """
@@ -361,25 +243,11 @@ struct CodexUsageVerifier {
         && snapshot.planType == "pro",
       "兼容 CLI 参数回退、顺序握手、snake_case 和秒级窗口字段"
     )
-  }
-
-  private static func runKimiIntegrationCheck() async throws {
-    let snapshot = try await KimiUsageClient().fetchUsage()
-    try expect((0...100).contains(snapshot.usedPercent), "K3 实时使用率范围")
-    try expect(snapshot.limitName == "K3", "K3 实时限额名称")
-    print(
-      "PASS 实时 K3 数据：已用 \(Int(snapshot.usedPercent.rounded()))%，"
-        + "剩余 \(Int(snapshot.remainingPercent.rounded()))%，"
-        + "套餐 \(snapshot.planType ?? "未知")"
+    try expect(
+      snapshot.tokenUsage?.lifetimeTokens == 123_456
+        && snapshot.tokenUsage?.dailyBuckets.first?.tokens == 12_000,
+      "读取官方 token 汇总与每日桶"
     )
-    if let fiveHour = snapshot.fiveHourWindow {
-      print(
-        "PASS 实时 K3 五小时限额：已用 "
-          + "\(Int(fiveHour.usedPercent.rounded()))%"
-      )
-    } else {
-      print("PASS 实时 K3 无五小时限额（按需隐藏）")
-    }
   }
 
   private static func verifyExecutableOverride() throws {
@@ -455,16 +323,6 @@ struct CodexUsageVerifier {
       "独立持久化 Widget 语言设置"
     )
 
-    let k3Preferences = SharedWidgetPreferences(
-      languageCode: AppLanguage.simplifiedChinese.rawValue,
-      subscriptionID: UsageSubscription.k3.rawValue
-    )
-    try preferencesStore.save(k3Preferences)
-    try expect(
-      preferencesStore.load() == k3Preferences,
-      "持久化 Widget 订阅选择"
-    )
-
     let legacyPreferences = try JSONDecoder().decode(
       SharedWidgetPreferences.self,
       from: Data("{\"languageCode\":\"en\"}".utf8)
@@ -487,10 +345,6 @@ struct CodexUsageVerifier {
     try expect(
       legacySnapshot.languageCode == nil,
       "兼容不含语言字段的旧 Widget 快照"
-    )
-    try expect(
-      legacySnapshot.fiveHourUsedPercent == nil,
-      "兼容不含五小时字段的旧 Widget 快照"
     )
     try expect(
       legacySnapshot.windowDurationMinutes == nil,
@@ -560,6 +414,289 @@ struct CodexUsageVerifier {
     try verifyLanguageTransition()
   }
 
+  private static func verifyEPDTransportBoundary() throws {
+    try expect(
+      NRFEPDDiscoveryPolicy.nameLooksCompatible("NRF_EPD_8042")
+        && NRFEPDDiscoveryPolicy.nameLooksCompatible("nrf-epd-8042")
+        && NRFEPDDiscoveryPolicy.nameLooksCompatible("EPD 8042"),
+      "兼容墨水屏广播名中的大小写和分隔符差异"
+    )
+    try expect(
+      NRFEPDDiscoveryPolicy.shouldAccept(
+        name: nil,
+        advertisesService: true
+      )
+        && !NRFEPDDiscoveryPolicy.shouldAccept(
+          name: "Laboratory sensor",
+          advertisesService: false
+        ),
+      "接受只广播服务 UUID 的设备并过滤无关设备"
+    )
+    try expect(
+      NRFEPDDiscoveryPolicy.isPreferred8042("NRF EPD 8042")
+        && NRFEPDDiscoveryPolicy.validSignalStrength(127) == nil
+        && NRFEPDDiscoveryPolicy.validSignalStrength(-62) == -62,
+      "优先选择 8042 并忽略 CoreBluetooth 无效 RSSI"
+    )
+    let nearbyEPD = EPDDeviceDescriptor(
+      id: "nearby",
+      name: "NRF_EPD_8042",
+      signalStrength: -48
+    )
+    let distantEPD = EPDDeviceDescriptor(
+      id: "distant",
+      name: "NRF_EPD_8042",
+      signalStrength: -72
+    )
+    try expect(
+      NRFEPDDiscoveryPolicy.clearlyStrongest(
+        in: [distantEPD, nearbyEPD]
+      ) == nearbyEPD,
+      "多台同型号设备时仅选择明显更近的一台"
+    )
+
+    let plane = Data(
+      repeating: 0xFF,
+      count: EPDFrame.standardPlaneByteCount
+    )
+    let frame = try EPDFrame(blackPlane: plane, redPlane: plane)
+    try expect(
+      frame.width == 400
+        && frame.height == 300
+        && frame.blackPlane.count == 15_000
+        && frame.redPlane.count == 15_000,
+      "保留 400×300 三色墨水屏帧接口"
+    )
+
+    do {
+      _ = try EPDFrame(
+        blackPlane: plane.dropLast(),
+        redPlane: plane
+      )
+      throw VerificationFailure("拒绝错误长度的墨水屏图层")
+    } catch EPDFrameValidationError.invalidPlaneByteCount {
+      print("PASS 拒绝错误长度的墨水屏图层")
+    }
+
+    let samplePlane = Data((0..<40).map(UInt8.init))
+    let modernPackets = try NRFEPDProtocol.imagePackets(
+      plane: samplePlane,
+      color: .black,
+      maximumWriteValueLength: 20,
+      usesModernHeader: true
+    )
+    try expect(
+      modernPackets.count == 3
+        && modernPackets[0].count == 20
+        && modernPackets[0].prefix(2)
+          == Data([NRFEPDProtocol.writeImageCommand, 0x02])
+        && modernPackets[1].prefix(2)
+          == Data([NRFEPDProtocol.writeImageCommand, 0x00]),
+      "按 MTU 构建 NRF_EPD v1.6 黑色分包"
+    )
+
+    let legacyPackets = try NRFEPDProtocol.imagePackets(
+      plane: samplePlane,
+      color: .red,
+      maximumWriteValueLength: 20,
+      usesModernHeader: false
+    )
+    try expect(
+      legacyPackets[0].prefix(2)
+        == Data([NRFEPDProtocol.writeImageCommand, 0x00])
+        && legacyPackets[1].prefix(2)
+          == Data([NRFEPDProtocol.writeImageCommand, 0xF0]),
+      "保留 NRF_EPD 旧固件红色分包兼容"
+    )
+
+    let legacyBlackPackets = try NRFEPDProtocol.imagePackets(
+      plane: samplePlane,
+      color: .black,
+      maximumWriteValueLength: 20,
+      usesModernHeader: false
+    )
+    try expect(
+      legacyBlackPackets[0].prefix(2)
+        == Data([NRFEPDProtocol.writeImageCommand, 0x0F])
+        && legacyBlackPackets[1].prefix(2)
+          == Data([NRFEPDProtocol.writeImageCommand, 0xFF]),
+      "匹配说明书控制器的旧固件黑色分包"
+    )
+
+    try expect(
+      !NRFEPDProtocol.shouldRequestWriteResponse(packetIndex: 49)
+        && NRFEPDProtocol.shouldRequestWriteResponse(packetIndex: 50),
+      "按卖家控制器策略每 51 个图像包请求一次确认"
+    )
+
+    let descriptor = EPDDeviceDescriptor(
+      id: UUID().uuidString,
+      name: "NRF_EPD_8042"
+    )
+    let information = NRFEPDDeviceInformation(
+      device: descriptor,
+      firmwareVersion: 0x16,
+      driverID: 0x02,
+      reportedMTU: 247,
+      supportsRLE: true
+    )
+    try expect(
+      information.isStandardThreeColorDisplay
+        && information.driverDescription.contains("SSD1619"),
+      "识别 NRF_EPD 4.2 英寸三色驱动"
+    )
+
+    let utc = TimeZone(secondsFromGMT: 0)!
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = utc
+    let liveDate = calendar.date(
+      from: DateComponents(year: 2026, month: 8, day: 30, hour: 17, minute: 8)
+    )!
+    let liveBuckets = zip(
+      24...30,
+      [420_000, 760_000, 510_000, 1_240_000, 900_000, 1_520_000, 680_000]
+    ).map { day, tokens in
+      SharedDailyTokenUsage(
+        startDate: String(format: "2026-08-%02d", day),
+        tokens: Int64(tokens)
+      )
+    }
+    let liveContent = EPDLiveContent(
+      now: liveDate,
+      updatedAt: liveDate,
+      remainingPercent: 90,
+      resetsAt: calendar.date(
+        from: DateComponents(year: 2026, month: 9, day: 1, hour: 8)
+      ),
+      lifetimeTokens: 32_800_000,
+      dailyTokenUsage: liveBuckets,
+      timeZone: utc
+    )
+    let liveFrame = try EPDLiveFrameRenderer.render(liveContent)
+    let liveBlackPixelCount = liveFrame.blackPlane.reduce(0) {
+      $0 + 8 - $1.nonzeroBitCount
+    }
+    let liveRedPixelCount = liveFrame.redPlane.reduce(0) {
+      $0 + 8 - $1.nonzeroBitCount
+    }
+    try expect(
+      liveBlackPixelCount > 1_000
+        && liveRedPixelCount > 500
+        && zip(liveFrame.blackPlane, liveFrame.redPlane).allSatisfy {
+          black, red in ((~black) & (~red)) == 0
+        },
+      "把实时额度和 Token 数据渲染为互斥黑红位图"
+    )
+    let changedFrame = try EPDLiveFrameRenderer.render(
+      EPDLiveContent(
+        now: liveDate,
+        updatedAt: liveDate,
+        remainingPercent: 74,
+        resetsAt: liveContent.resetsAt,
+        lifetimeTokens: liveContent.lifetimeTokens,
+        dailyTokenUsage: liveBuckets,
+        timeZone: utc
+      )
+    )
+    try expect(changedFrame != liveFrame, "实时额度变化会生成不同的墨水屏帧")
+
+    let firstFingerprint = try EPDSyncPolicy.contentFingerprint(liveContent)
+    let laterFooterTime = EPDLiveContent(
+      now: liveContent.now,
+      updatedAt: liveContent.updatedAt.addingTimeInterval(25 * 60),
+      remainingPercent: liveContent.remainingPercent,
+      resetsAt: liveContent.resetsAt,
+      lifetimeTokens: liveContent.lifetimeTokens,
+      dailyTokenUsage: liveContent.dailyTokenUsage,
+      timeZone: liveContent.timeZone
+    )
+    let laterFooterFingerprint = try EPDSyncPolicy.contentFingerprint(
+      laterFooterTime
+    )
+    try expect(
+      laterFooterFingerprint == firstFingerprint,
+      "墨水屏内容哈希忽略单独变化的更新时间"
+    )
+    let changedContentFingerprint = try EPDSyncPolicy.contentFingerprint(
+      EPDLiveContent(
+        now: liveContent.now,
+        updatedAt: liveContent.updatedAt,
+        remainingPercent: 74,
+        resetsAt: liveContent.resetsAt,
+        lifetimeTokens: liveContent.lifetimeTokens,
+        dailyTokenUsage: liveContent.dailyTokenUsage,
+        timeZone: liveContent.timeZone
+      )
+    )
+    try expect(
+      changedContentFingerprint != firstFingerprint,
+      "墨水屏内容变化会生成新的稳定哈希"
+    )
+    try expect(
+      !EPDSyncPolicy.automaticSyncIsDue(
+        now: liveDate,
+        lastCheckAt: liveDate.addingTimeInterval(-59 * 60),
+        timeZone: utc
+      )
+        && EPDSyncPolicy.automaticSyncIsDue(
+          now: liveDate,
+          lastCheckAt: liveDate.addingTimeInterval(-60 * 60),
+          timeZone: utc
+        )
+        && EPDSyncPolicy.automaticSyncIsDue(
+          now: liveDate,
+          lastCheckAt: calendar.date(
+            byAdding: .day,
+            value: -1,
+            to: liveDate
+          ),
+          timeZone: utc
+        ),
+      "墨水屏每小时检查并在跨日后立即同步"
+    )
+
+    let previewURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+      .appendingPathComponent("docs/images/epd-v1-preview.png")
+    if FileManager.default.fileExists(atPath: previewURL.path) {
+      let previewFrame = try EPDPreviewFrameLoader.load(from: previewURL)
+      let blackPixelCount = previewFrame.blackPlane.reduce(0) {
+        $0 + 8 - $1.nonzeroBitCount
+      }
+      let redPixelCount = previewFrame.redPlane.reduce(0) {
+        $0 + 8 - $1.nonzeroBitCount
+      }
+      print(
+        "INFO EPD preview pixels: black=\(blackPixelCount), red=\(redPixelCount)"
+      )
+      let planesDoNotOverlap = zip(
+        previewFrame.blackPlane,
+        previewFrame.redPlane
+      ).allSatisfy { black, red in
+        ((~black) & (~red)) == 0
+      }
+      try expect(
+        blackPixelCount > 1_000
+          && blackPixelCount < 40_000
+          && redPixelCount > 500
+          && redPixelCount < 20_000
+          && previewFrame.blackPlane.contains(where: { $0 != 0xFF })
+          && previewFrame.redPlane.contains(where: { $0 != 0xFF })
+          && planesDoNotOverlap,
+        "把批准的预览图转换为互斥黑红位图"
+      )
+      let flippedOrigin = EPDPreviewFrameLoader.verticallyFlippedSourceCoordinate(
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 300
+      )
+      try expect(
+        flippedOrigin.x == 0 && flippedOrigin.y == 299,
+        "按实体屏安装方向仅纵向翻转画面"
+      )
+    }
+  }
+
   private static func verifyLanguageTransition() throws {
     var transition = LanguageTransitionState(current: .simplifiedChinese)
 
@@ -620,8 +757,8 @@ struct CodexUsageVerifier {
       server.stop()
     }
 
-    try await Task.sleep(nanoseconds: 150_000_000)
-    let client = LocalUsageSnapshotClient(ports: ports)
+    try await Task.sleep(nanoseconds: 300_000_000)
+    let client = LocalUsageSnapshotClient(ports: ports, timeout: 1.5)
     let received = await withCheckedContinuation { continuation in
       client.load { snapshot in
         continuation.resume(returning: snapshot)
@@ -637,8 +774,11 @@ struct CodexUsageVerifier {
       languageServer.stop()
     }
 
-    try await Task.sleep(nanoseconds: 150_000_000)
-    let languageClient = LocalUsageSnapshotClient(ports: languagePorts)
+    try await Task.sleep(nanoseconds: 300_000_000)
+    let languageClient = LocalUsageSnapshotClient(
+      ports: languagePorts,
+      timeout: 1.5
+    )
     let languagePayload = await withCheckedContinuation { continuation in
       languageClient.loadPayload { payload in
         continuation.resume(returning: payload)

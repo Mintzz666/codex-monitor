@@ -1,3 +1,4 @@
+import Charts
 import CodexUsageShared
 import SwiftUI
 import WidgetKit
@@ -19,6 +20,13 @@ private struct UsageTimelineEntry: TimelineEntry {
     self.languageCode = languageCode
     self.subscriptionID = subscriptionID
   }
+}
+
+private struct TokenChartPoint: Identifiable {
+  let index: Int
+  let bucket: SharedDailyTokenUsage
+
+  var id: String { bucket.id }
 }
 
 private struct UsageTimelineProvider: TimelineProvider {
@@ -68,7 +76,7 @@ private struct UsageTimelineProvider: TimelineProvider {
         languageCode: languageCode,
         subscriptionID: subscriptionID
       )
-      let routineRefresh = now.addingTimeInterval(15 * 60)
+      let routineRefresh = now.addingTimeInterval(60)
       let refreshDate =
         snapshot?.resetsAt.map {
           min(routineRefresh, max(now.addingTimeInterval(60), $0))
@@ -145,20 +153,16 @@ private struct UsageWidgetView: View {
     )
   }
 
-  private var subscription: UsageSubscription {
-    UsageSubscription.resolve(
-      entry.snapshot?.subscriptionID ?? entry.subscriptionID
-    )
-  }
-
   var body: some View {
     Group {
       if let snapshot = entry.snapshot {
         switch family {
+        case .systemLarge:
+          largeContent(snapshot)
         case .systemMedium:
           mediumContent(snapshot)
         default:
-          smallContent(snapshot)
+          mediumContent(snapshot)
         }
       } else {
         emptyContent
@@ -169,81 +173,132 @@ private struct UsageWidgetView: View {
     .accessibilityElement(children: .combine)
   }
 
-  private func smallContent(
+  private func mediumContent(
     _ snapshot: SharedUsageSnapshot
   ) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 9) {
       header(snapshot)
 
-      Spacer(minLength: 0)
-
-      HStack(alignment: .center, spacing: 12) {
-        usageRing(snapshot)
-
-        VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .lastTextBaseline) {
+        VStack(alignment: .leading, spacing: 1) {
           Text(language.text(.remainingQuota))
             .font(.caption)
             .foregroundStyle(.secondary)
           Text(percentText(snapshot.remainingPercent))
-            .font(.title3.weight(.semibold))
+            .font(.system(size: 30, weight: .bold, design: .rounded))
             .monospacedDigit()
         }
+        Spacer()
+        Text(planDisplayName(snapshot))
+          .font(.caption.weight(.semibold))
+          .padding(.horizontal, 8)
+          .padding(.vertical, 4)
+          .background(
+            Color.accentColor.opacity(0.12),
+            in: Capsule()
+          )
       }
 
-      Spacer(minLength: 0)
+      quotaBar(snapshot)
 
-      resetText(snapshot)
+      HStack(spacing: 8) {
+        metricPill(
+          language.text(.weeklyUsed),
+          percentText(snapshot.usedPercent)
+        )
+        metricPill(
+          language.text(.resetTime),
+          language.resetDisplayText(snapshot.resetsAt)
+        )
+      }
     }
     .padding(14)
   }
 
-  private func mediumContent(
+  private func largeContent(
     _ snapshot: SharedUsageSnapshot
   ) -> some View {
-    HStack(spacing: 16) {
-      VStack(alignment: .leading, spacing: 10) {
-        header(snapshot)
-        usageRing(snapshot)
-      }
-
-      Divider()
+    VStack(alignment: .leading, spacing: 8) {
+      header(snapshot)
 
       VStack(alignment: .leading, spacing: 7) {
-        compactRow(
-          language.text(
-            subscription.usesWeeklyWindow ? .weeklyUsed : .windowUsed
-          ),
-          percentText(snapshot.usedPercent)
-        )
-        compactRow(
-          language.text(.remainingQuota),
-          percentText(snapshot.remainingPercent)
-        )
-        if let fiveHourUsed = snapshot.fiveHourUsedPercent {
-          compactRow(
-            language.text(.fiveHourLimit),
-            percentText(fiveHourUsed)
-          )
+        HStack(alignment: .lastTextBaseline) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text(language.text(.remainingQuota))
+              .font(.subheadline.weight(.semibold))
+              .foregroundStyle(.secondary)
+            Text(percentText(snapshot.remainingPercent))
+              .font(.system(size: 32, weight: .bold, design: .rounded))
+              .monospacedDigit()
+          }
+          Spacer()
+          VStack(alignment: .trailing, spacing: 3) {
+            Text(planDisplayName(snapshot))
+              .font(.caption.weight(.bold))
+            Text(language.resetDisplayText(snapshot.resetsAt))
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+          }
         }
-        compactRow(
-          language.text(.resetTime),
-          language.resetDisplayText(snapshot.resetsAt)
-        )
 
-        Spacer(minLength: 0)
+        quotaBar(snapshot)
 
+        HStack {
+          Text(
+            "\(language.text(.weeklyUsed)) "
+              + percentText(snapshot.usedPercent)
+          )
+          Spacer()
+          if let lifetimeTokens = snapshot.lifetimeTokens {
+            Text(
+              (language == .simplifiedChinese ? "累计 " : "Lifetime ")
+                + tokenText(lifetimeTokens)
+            )
+          }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      }
+
+      .padding(10)
+      .background(
+        Color.accentColor.opacity(0.08),
+        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+      )
+
+      VStack(alignment: .leading, spacing: 6) {
+        HStack {
+          Text(language == .simplifiedChinese ? "最近 7 天 Token" : "Tokens · last 7 days")
+            .font(.subheadline.weight(.semibold))
+          Spacer()
+          Text(latestDailyTokenText(snapshot))
+            .font(.caption.weight(.semibold))
+            .monospacedDigit()
+        }
+
+        tokenChart(snapshot)
+          .frame(height: 74)
+      }
+      .padding(10)
+      .background(
+        .primary.opacity(0.04),
+        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+      )
+
+      HStack {
+        resetText(snapshot)
+        Spacer()
         Text(updatedText(snapshot))
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .padding(16)
+    .padding(6)
   }
 
   private var emptyContent: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Label(subscription.displayName.uppercased(), systemImage: "chart.bar.fill")
+      Label("CODEX MONITOR", systemImage: "chart.bar.fill")
         .font(.headline)
 
       Spacer()
@@ -262,8 +317,20 @@ private struct UsageWidgetView: View {
     _ snapshot: SharedUsageSnapshot
   ) -> some View {
     HStack(spacing: 6) {
-      Text(subscription.displayName.uppercased())
-        .font(.headline)
+      ZStack {
+        RoundedRectangle(cornerRadius: 5, style: .continuous)
+          .fill(Color.accentColor.opacity(0.14))
+        Text(">_")
+          .font(.system(size: 8, weight: .black, design: .monospaced))
+          .foregroundStyle(Color.accentColor)
+      }
+      .frame(width: 22, height: 22)
+
+      Text("Codex Monitor")
+        .font(.system(size: 14, weight: .bold, design: .rounded))
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .allowsTightening(true)
       Spacer(minLength: 4)
       if snapshot.isStale() {
         Image(systemName: "clock.badge.exclamationmark")
@@ -271,38 +338,77 @@ private struct UsageWidgetView: View {
           .help(language.widgetStaleHelp)
       } else {
         Circle()
-          .fill(progressColor(snapshot.usedPercent))
+          .fill(progressColor(snapshot.remainingPercent))
           .frame(width: 7, height: 7)
           .accessibilityHidden(true)
       }
     }
   }
 
-  private func usageRing(
+  private func quotaBar(
     _ snapshot: SharedUsageSnapshot
   ) -> some View {
-    ZStack {
-      Circle()
-        .stroke(.secondary.opacity(0.16), lineWidth: 8)
-      Circle()
-        .trim(from: 0, to: snapshot.usedPercent / 100)
-        .stroke(
-          progressColor(snapshot.usedPercent),
-          style: StrokeStyle(lineWidth: 8, lineCap: .round)
-        )
-        .rotationEffect(.degrees(-90))
-      VStack(spacing: 0) {
-        Text(percentText(snapshot.usedPercent))
-          .font(.system(size: 22, weight: .bold, design: .rounded))
-          .monospacedDigit()
-        Text(language.widgetUsedText)
-          .font(.caption2)
-          .foregroundStyle(.secondary)
+    GeometryReader { geometry in
+      ZStack(alignment: .leading) {
+        Capsule()
+          .fill(.secondary.opacity(0.15))
+        Capsule()
+          .fill(
+            LinearGradient(
+              colors: [
+                progressColor(snapshot.remainingPercent).opacity(0.7),
+                progressColor(snapshot.remainingPercent),
+              ],
+              startPoint: .leading,
+              endPoint: .trailing
+            )
+          )
+          .frame(
+            width: geometry.size.width
+              * min(1, max(0, snapshot.remainingPercent / 100))
+          )
+          .shadow(
+            color: progressColor(snapshot.remainingPercent).opacity(0.25),
+            radius: 3,
+            y: 1
+          )
       }
     }
-    .frame(width: 82, height: 82)
-    .accessibilityLabel(language.text(.weeklyUsed))
-    .accessibilityValue(percentText(snapshot.usedPercent))
+    .frame(height: family == .systemLarge ? 11 : 10)
+    .accessibilityLabel(language.text(.remainingQuota))
+    .accessibilityValue(percentText(snapshot.remainingPercent))
+  }
+
+  private func metricPill(_ title: String, _ value: String) -> some View {
+    HStack(spacing: 4) {
+      Text(title)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+      Spacer(minLength: 3)
+      Text(value)
+        .fontWeight(.semibold)
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+    }
+    .font(.caption2)
+    .padding(.horizontal, 8)
+    .padding(.vertical, 6)
+    .frame(maxWidth: .infinity)
+    .background(
+      .primary.opacity(0.045),
+      in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+    )
+  }
+
+  private func planDisplayName(_ snapshot: SharedUsageSnapshot) -> String {
+    guard let planType = snapshot.planType, !planType.isEmpty else {
+      return "Codex"
+    }
+    if planType.lowercased() == "prolite" {
+      return "Pro"
+    }
+    return planType.prefix(1).uppercased() + planType.dropFirst()
   }
 
   private func resetText(
@@ -331,14 +437,14 @@ private struct UsageWidgetView: View {
     }
   }
 
-  private func progressColor(_ usedPercent: Double) -> Color {
-    if usedPercent >= 90 {
+  private func progressColor(_ remainingPercent: Double) -> Color {
+    if remainingPercent <= 10 {
       return .red
     }
-    if usedPercent >= 75 {
+    if remainingPercent <= 25 {
       return .orange
     }
-    return .accentColor
+    return .green
   }
 
   private func percentText(_ value: Double) -> String {
@@ -352,6 +458,112 @@ private struct UsageWidgetView: View {
       snapshot.updatedAt,
       isStale: snapshot.isStale()
     )
+  }
+
+  private func tokenChart(_ snapshot: SharedUsageSnapshot) -> some View {
+    let buckets = Array((snapshot.dailyTokenUsage ?? []).suffix(7))
+    let points = buckets.enumerated().map {
+      TokenChartPoint(index: $0.offset, bucket: $0.element)
+    }
+    let maximum = Double(max(1, buckets.map(\.tokens).max() ?? 1))
+
+    return Group {
+      if buckets.isEmpty {
+        Text(language == .simplifiedChinese ? "暂无每日 Token 数据" : "No daily token data yet")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+      } else {
+        Chart(points) { point in
+          AreaMark(
+            x: .value("Day", point.index),
+            y: .value("Tokens", Double(point.bucket.tokens))
+          )
+          .foregroundStyle(
+            LinearGradient(
+              colors: [Color.accentColor.opacity(0.3), Color.accentColor.opacity(0.02)],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+          )
+
+          LineMark(
+            x: .value("Day", point.index),
+            y: .value("Tokens", Double(point.bucket.tokens))
+          )
+          .foregroundStyle(Color.accentColor)
+          .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+
+          PointMark(
+            x: .value("Day", point.index),
+            y: .value("Tokens", Double(point.bucket.tokens))
+          )
+          .foregroundStyle(Color.accentColor)
+          .symbolSize(18)
+        }
+        .chartYScale(domain: 0...(maximum * 1.15))
+        .chartYAxis {
+          AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { value in
+            AxisGridLine()
+              .foregroundStyle(.secondary.opacity(0.12))
+            AxisValueLabel {
+              if let number = value.as(Double.self) {
+                Text(tokenText(Int64(number.rounded())))
+                  .font(.system(size: 7))
+              }
+            }
+          }
+        }
+        .chartXAxis {
+          AxisMarks(values: Array(buckets.indices)) { value in
+            AxisValueLabel {
+              if let index = value.as(Int.self), buckets.indices.contains(index) {
+                Text(shortDate(buckets[index].startDate))
+                  .font(.system(size: 8))
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private func latestDailyTokenText(_ snapshot: SharedUsageSnapshot) -> String {
+    guard let tokens = snapshot.dailyTokenUsage?.suffix(7).last?.tokens else {
+      return "—"
+    }
+    return tokenText(tokens)
+  }
+
+  private func tokenText(_ tokens: Int64) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.maximumFractionDigits = 1
+    if tokens >= 1_000_000 {
+      return "\(String(format: "%.1f", Double(tokens) / 1_000_000))M"
+    }
+    if tokens >= 1_000 {
+      return "\(String(format: "%.1f", Double(tokens) / 1_000))K"
+    }
+    return formatter.string(from: NSNumber(value: tokens)) ?? "\(tokens)"
+  }
+
+  private func shortDate(_ value: String) -> String {
+    let pieces = value.split(separator: "-")
+    guard pieces.count == 3 else { return value }
+    return "\(pieces[1])/\(pieces[2])"
+  }
+
+  private func windowDisplayName(_ window: SharedUsageWindow) -> String {
+    if let label = window.label, !label.isEmpty, label.lowercased() != "codex" {
+      return label
+    }
+    let minutes = window.windowDurationMinutes
+    if minutes % 60 == 0 {
+      let hours = minutes / 60
+      return language == .simplifiedChinese ? "\(hours) 小时窗口" : "\(hours)-hour window"
+    }
+    return language == .simplifiedChinese ? "其他窗口" : "Other window"
   }
 }
 
@@ -409,7 +621,7 @@ struct CodexUsageWidget: Widget {
     }
     .configurationDisplayName(language.widgetDisplayName)
     .description(language.widgetDescription)
-    .supportedFamilies([.systemSmall, .systemMedium])
+    .supportedFamilies([.systemMedium, .systemLarge])
   }
 }
 

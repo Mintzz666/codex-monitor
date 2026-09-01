@@ -36,7 +36,8 @@ public actor CodexAppServerClient {
         return try decodeUsage(from: responses)
       } catch {
         lastError = error
-        let canRetry = index + 1 < configurations.count
+        let canRetry =
+          index + 1 < configurations.count
           && CodexAppServerProbeConfiguration.shouldRetry(after: error)
         if !canRetry {
           throw error
@@ -82,10 +83,31 @@ public actor CodexAppServerClient {
       throw CodexAppServerClientError.notSignedIn
     }
 
-    return try WeeklyUsageSelector.select(
+    let selected = try WeeklyUsageSelector.select(
       from: rateLimits,
       accountPlanType: accountEnvelope.result?.account?.planType
     )
+
+    guard let usageData = responses[3],
+      let usageEnvelope = try? decoder.decode(
+        RPCEnvelope<AccountUsageReadResult>.self,
+        from: usageData
+      ),
+      usageEnvelope.error == nil,
+      let usage = usageEnvelope.result
+    else {
+      return selected
+    }
+
+    let tokenUsage = TokenUsage(
+      lifetimeTokens: usage.summary?.lifetimeTokens,
+      peakDailyTokens: usage.summary?.peakDailyTokens,
+      currentStreakDays: usage.summary?.currentStreakDays,
+      dailyBuckets: (usage.dailyUsageBuckets ?? []).map {
+        DailyTokenUsage(startDate: $0.startDate, tokens: $0.tokens)
+      }
+    )
+    return selected.attaching(tokenUsage: tokenUsage)
   }
 }
 
@@ -254,7 +276,7 @@ private struct CodexAppServerProbe: Sendable {
     }
 
     write(
-      "{\"method\":\"initialize\",\"id\":0,\"params\":{\"clientInfo\":{\"name\":\"codex-usage-bar\",\"title\":\"Codex Usage Bar\",\"version\":\"0.1.0\"}}}\n",
+      "{\"method\":\"initialize\",\"id\":0,\"params\":{\"clientInfo\":{\"name\":\"codex-monitor\",\"title\":\"Codex Monitor\",\"version\":\"0.1.0\"}}}\n",
       to: inputHandle
     )
 
@@ -274,7 +296,8 @@ private struct CodexAppServerProbe: Sendable {
       revents: 0
     )
     var didSendInitialized = false
-    var didSendRateLimitsRequest = false
+    var didSendAccountDataRequests = false
+    var accountDataRequestsSentAt: Date?
 
     while Date() < deadline {
       let remainingMilliseconds = max(
@@ -317,16 +340,25 @@ private struct CodexAppServerProbe: Sendable {
         didSendInitialized = true
       }
 
-      if responses[1] != nil, !didSendRateLimitsRequest {
+      if responses[1] != nil, !didSendAccountDataRequests {
         write(
-          "{\"method\":\"account/rateLimits/read\",\"id\":2}\n",
+          "{\"method\":\"account/rateLimits/read\",\"id\":2}\n"
+            + "{\"method\":\"account/usage/read\",\"id\":3}\n",
           to: inputHandle
         )
-        didSendRateLimitsRequest = true
+        didSendAccountDataRequests = true
+        accountDataRequestsSentAt = Date()
       }
 
       if responses[1] != nil, responses[2] != nil {
-        return responses
+        if responses[3] != nil {
+          return responses
+        }
+        if let accountDataRequestsSentAt,
+          Date().timeIntervalSince(accountDataRequestsSentAt) >= 2
+        {
+          return responses
+        }
       }
 
       if !process.isRunning {
@@ -374,7 +406,7 @@ private struct CodexAppServerProbe: Sendable {
       if header.id == 0, let error = header.error {
         throw error
       }
-      if let id = header.id, id == 0 || id == 1 || id == 2 {
+      if let id = header.id, (0...3).contains(id) {
         responses[id] = line
       }
     }

@@ -2,17 +2,20 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="Codex Usage Bar"
-VERSION="${VERSION:-0.3.4}"
-BUILD_NUMBER="${BUILD_NUMBER:-6}"
-APP_GROUP_IDENTIFIER="${APP_GROUP_IDENTIFIER:-group.io.cmmuu.codex-usage-bar}"
+APP_NAME="Codex Monitor"
+VERSION="${VERSION:-1.4.2}"
+BUILD_NUMBER="${BUILD_NUMBER:-38}"
+APP_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER:-com.example.codexmonitor}"
+APP_GROUP_IDENTIFIER="${APP_GROUP_IDENTIFIER:-group.com.example.codexmonitor}"
+WIDGET_BUNDLE_IDENTIFIER="${WIDGET_BUNDLE_IDENTIFIER:-com.example.codexmonitor.widget}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 DERIVED_DATA="$ROOT/.build/xcode"
 APP_SOURCE="$DERIVED_DATA/Build/Products/Release/$APP_NAME.app"
 APP_DIR="$ROOT/dist/$APP_NAME.app"
-WIDGET_DIR="$APP_DIR/Contents/PlugIns/CodexUsageWidget.appex"
+WIDGET_DIR="$APP_DIR/Contents/PlugIns/CodexMonitorWidget.appex"
 ICON_PATH="$APP_DIR/Contents/Resources/AppIcon.icns"
-SPARKLE_FRAMEWORK="$APP_DIR/Contents/Frameworks/Sparkle.framework"
+APP_EXECUTABLE="$APP_DIR/Contents/MacOS/$APP_NAME"
+WIDGET_EXECUTABLE="$WIDGET_DIR/Contents/MacOS/CodexMonitorWidget"
 
 cd "$ROOT"
 
@@ -30,6 +33,7 @@ rm -rf "$DERIVED_DATA" "$APP_DIR"
 mkdir -p "$ROOT/dist"
 
 xcodebuild \
+  -quiet \
   -project "$ROOT/CodexUsageBar.xcodeproj" \
   -scheme CodexUsageBar \
   -configuration Release \
@@ -38,12 +42,19 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+  APP_BUNDLE_IDENTIFIER="$APP_BUNDLE_IDENTIFIER" \
   APP_GROUP_IDENTIFIER="$APP_GROUP_IDENTIFIER" \
+  WIDGET_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_IDENTIFIER" \
   ARCHS="arm64 x86_64" \
   ONLY_ACTIVE_ARCH=NO \
   build
 
 ditto "$APP_SOURCE" "$APP_DIR"
+
+# Local development builds can inherit provenance/quarantine metadata while
+# being copied between build and install locations. That metadata makes
+# LaunchServices re-evaluate an otherwise valid stable signature after reboot.
+xattr -cr "$APP_DIR"
 
 if [[ ! -d "$WIDGET_DIR" ]]; then
   printf 'Missing embedded WidgetKit extension: %s\n' "$WIDGET_DIR" >&2
@@ -53,10 +64,15 @@ if [[ ! -f "$ICON_PATH" ]]; then
   printf 'Missing application icon: %s\n' "$ICON_PATH" >&2
   exit 1
 fi
-if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
-  printf 'Missing embedded Sparkle framework: %s\n' "$SPARKLE_FRAMEWORK" >&2
+if [[ ! -f "$APP_EXECUTABLE" || ! -f "$WIDGET_EXECUTABLE" ]]; then
+  printf '%s\n' "Missing executable in the packaged app or widget." >&2
   exit 1
 fi
+
+# Xcode release products can retain DWARF paths that disclose the build machine's
+# local username and checkout path. Remove debug symbols before distribution.
+strip -S "$APP_EXECUTABLE"
+strip -S "$WIDGET_EXECUTABLE"
 
 TEMPORARY_ENTITLEMENTS="$(mktemp -d)"
 trap 'rm -rf "$TEMPORARY_ENTITLEMENTS"' EXIT
@@ -80,28 +96,6 @@ if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
   SIGN_ARGUMENTS+=(--options runtime --timestamp)
 fi
 
-SPARKLE_SIGN_ARGUMENTS=(--force --sign "$CODE_SIGN_IDENTITY" --options runtime)
-if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
-  SPARKLE_SIGN_ARGUMENTS+=(--timestamp)
-fi
-
-codesign \
-  "${SPARKLE_SIGN_ARGUMENTS[@]}" \
-  "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Installer.xpc"
-codesign \
-  "${SPARKLE_SIGN_ARGUMENTS[@]}" \
-  --preserve-metadata=entitlements \
-  "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc"
-codesign \
-  "${SPARKLE_SIGN_ARGUMENTS[@]}" \
-  "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
-codesign \
-  "${SPARKLE_SIGN_ARGUMENTS[@]}" \
-  "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
-codesign \
-  "${SPARKLE_SIGN_ARGUMENTS[@]}" \
-  "$SPARKLE_FRAMEWORK"
-
 codesign \
   "${SIGN_ARGUMENTS[@]}" \
   --entitlements "$TEMPORARY_ENTITLEMENTS/widget.entitlements" \
@@ -117,5 +111,8 @@ codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 
 printf 'Packaged: %s\n' "$APP_DIR"
 printf 'Version: %s (%s)\n' "$VERSION" "$BUILD_NUMBER"
-printf 'App Group: %s\n' "$APP_GROUP_IDENTIFIER"
-printf 'Sparkle: 2.9.4\n'
+if [[ "${SHOW_BUNDLE_IDENTIFIERS:-0}" == "1" ]]; then
+  printf 'App bundle: %s\n' "$APP_BUNDLE_IDENTIFIER"
+  printf 'Widget bundle: %s\n' "$WIDGET_BUNDLE_IDENTIFIER"
+  printf 'App Group: %s\n' "$APP_GROUP_IDENTIFIER"
+fi

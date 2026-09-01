@@ -5,6 +5,34 @@ import Foundation
 import ServiceManagement
 import WidgetKit
 
+struct UsageHistoryPoint: Codable, Equatable, Identifiable, Sendable {
+  let date: Date
+  let usedPercent: Double
+
+  var id: Date { date }
+}
+
+enum EPDProbePhase: Equatable {
+  case idle
+  case scanning
+  case connecting(String)
+  case reading(String)
+  case ready
+  case failed(String)
+
+  var isBusy: Bool {
+    switch self {
+    case .scanning, .connecting, .reading: return true
+    case .idle, .ready, .failed: return false
+    }
+  }
+}
+
+private enum EPDSyncTrigger {
+  case manual
+  case automatic
+}
+
 @MainActor
 final class UsageViewModel: ObservableObject {
   @Published private(set) var snapshot: UsageSnapshot?
@@ -16,20 +44,30 @@ final class UsageViewModel: ObservableObject {
   @Published private(set) var selectedSubscription: UsageSubscription
   @Published private(set) var displayLanguage: AppLanguage
   @Published private(set) var isLanguageSwitching = false
+  @Published private(set) var usageHistory: [UsageHistoryPoint]
+  @Published private(set) var epdProbePhase: EPDProbePhase = .idle
+  @Published private(set) var epdInformation: NRFEPDDeviceInformation?
+  @Published private(set) var isSendingEPDFrame = false
+  @Published private(set) var epdSendMessage: String?
+  @Published private(set) var lastEPDSyncAt: Date?
 
   private let client: CodexAppServerClient
-  private let kimiClient: KimiUsageClient
   private let sharedUsageStore: SharedUsageStore
   private let sharedWidgetPreferencesStore: SharedWidgetPreferencesStore
   private let localUsageServer: LocalUsageSnapshotServer
   private let languageDefaults: UserDefaults
+  private var epdTransport: NRFEPDBluetoothTransport?
   private var languageTransition: LanguageTransitionState
   private var activated = false
   private var refreshLoop: Task<Void, Never>?
+  private var epdAutomaticSyncLoop: Task<Void, Never>?
+  private var lastEPDCheckAt: Date?
+  private var lastEPDFrameFingerprint: String?
+  private static let refreshIntervalNanoseconds: UInt64 = 60_000_000_000
+  private static let epdSchedulerTickNanoseconds: UInt64 = 60_000_000_000
 
   init(
     client: CodexAppServerClient = CodexAppServerClient(),
-    kimiClient: KimiUsageClient = KimiUsageClient(),
     sharedUsageStore: SharedUsageStore = SharedUsageStore(),
     sharedWidgetPreferencesStore: SharedWidgetPreferencesStore =
       SharedWidgetPreferencesStore(),
@@ -38,11 +76,11 @@ final class UsageViewModel: ObservableObject {
     languageDefaults: UserDefaults = .standard
   ) {
     self.client = client
-    self.kimiClient = kimiClient
     self.sharedUsageStore = sharedUsageStore
     self.sharedWidgetPreferencesStore = sharedWidgetPreferencesStore
     self.localUsageServer = localUsageServer
     self.languageDefaults = languageDefaults
+    usageHistory = Self.loadUsageHistory(from: languageDefaults)
     let initialLanguage =
       displayLanguage
       ?? AppLanguage.resolve(
@@ -54,19 +92,20 @@ final class UsageViewModel: ObservableObject {
       sharedWidgetPreferencesStore.load()?.subscriptionID
     )
     restoreCachedSnapshot()
+    restoreEPDState()
   }
 
   deinit {
     refreshLoop?.cancel()
+    epdAutomaticSyncLoop?.cancel()
     localUsageServer.stop()
   }
 
   var menuBarText: String {
-    let name = selectedSubscription.displayName
     if let snapshot {
-      return "\(name) \(Int(snapshot.usedPercent.rounded()))%"
+      return "\(Int(snapshot.remainingPercent.rounded()))%"
     }
-    return isRefreshing ? "\(name) …" : "\(name) --"
+    return isRefreshing ? "…" : "--%"
   }
 
   /// The language that will be applied after the in-flight refresh finishes.
@@ -93,6 +132,9 @@ final class UsageViewModel: ObservableObject {
   func planDisplayName(for language: AppLanguage) -> String {
     guard let plan = snapshot?.planType, !plan.isEmpty else {
       return language.text(.unknown)
+    }
+    if plan.lowercased() == "prolite" {
+      return "Pro"
     }
     return plan.prefix(1).uppercased() + plan.dropFirst()
   }
@@ -141,9 +183,10 @@ final class UsageViewModel: ObservableObject {
     }
     activated = true
     localUsageServer.start()
-    refreshLaunchAtLoginStatus()
+    ensureLaunchAtLoginEnabled()
     await refresh()
     startRefreshLoop()
+    startEPDAutomaticSyncLoop()
   }
 
   func refreshIfStale(maxAge: TimeInterval = 60) async {
@@ -165,17 +208,15 @@ final class UsageViewModel: ObservableObject {
     }
 
     do {
-      let fetchedSnapshot: UsageSnapshot
-      switch selectedSubscription {
-      case .codex:
-        fetchedSnapshot = try await client.fetchUsage()
-      case .k3:
-        fetchedSnapshot = try await kimiClient.fetchUsage()
-      }
+      let fetchedSnapshot = try await client.fetchUsage()
       let updatedAt = Date()
       snapshot = fetchedSnapshot
       lastUpdated = updatedAt
       errorMessage = nil
+      recordUsageHistory(
+        usedPercent: fetchedSnapshot.usedPercent,
+        at: updatedAt
+      )
       if let pendingLanguage = takePendingDisplayLanguage() {
         updateDisplayLanguageState(pendingLanguage)
       }
@@ -203,22 +244,325 @@ final class UsageViewModel: ObservableObject {
     refreshLaunchAtLoginStatus()
   }
 
+  func probeEPD() {
+    guard !epdProbePhase.isBusy, !isSendingEPDFrame else { return }
+    epdSendMessage = nil
+
+    Task {
+      let epdTransport = makeEPDTransport()
+      do {
+        epdProbePhase = .scanning
+        let devices = try await epdTransport.scan()
+        let device = try selectEPDDevice(from: devices)
+
+        epdProbePhase = .connecting(device.name)
+        try await epdTransport.connect(to: device)
+
+        epdProbePhase = .reading(device.name)
+        let information = try await epdTransport.waitForInformation()
+        receiveEPDInformation(information)
+        epdProbePhase = .ready
+        epdSendMessage = "detected"
+      } catch {
+        let message =
+          (error as? LocalizedError)?.errorDescription
+          ?? error.localizedDescription
+        epdProbePhase = .failed(message)
+      }
+      await epdTransport.disconnect()
+    }
+  }
+
+  func disconnectEPD() {
+    Task {
+      await epdTransport?.disconnect()
+      epdProbePhase = epdInformation == nil ? .idle : .ready
+    }
+  }
+
+  func sendEPDLiveFrame() {
+    Task {
+      await synchronizeEPD(trigger: .manual)
+    }
+  }
+
+  private func synchronizeEPD(trigger: EPDSyncTrigger) async {
+    guard !isSendingEPDFrame, !epdProbePhase.isBusy else { return }
+
+    let checkDate = Date()
+    lastEPDCheckAt = checkDate
+    languageDefaults.set(checkDate, forKey: Self.epdLastCheckAtStorageKey)
+    isSendingEPDFrame = true
+    epdSendMessage = nil
+    defer { isSendingEPDFrame = false }
+
+    do {
+      try await refreshUsageForEPD()
+      let content = try makeEPDLiveContent(now: Date())
+      let fingerprint = try EPDSyncPolicy.contentFingerprint(content)
+      if fingerprint == lastEPDFrameFingerprint {
+        epdProbePhase = epdInformation == nil ? .idle : .ready
+        epdSendMessage = "unchanged"
+        return
+      }
+
+      let frame = try EPDLiveFrameRenderer.render(content)
+      var finalError: Error?
+      for attempt in 0..<2 {
+        do {
+          let epdTransport = makeEPDTransport()
+          try await connectAndSendEPD(frame, using: epdTransport)
+          await epdTransport.disconnect()
+
+          let sentAt = Date()
+          lastEPDFrameFingerprint = fingerprint
+          lastEPDSyncAt = sentAt
+          languageDefaults.set(
+            fingerprint,
+            forKey: Self.epdLastFrameFingerprintStorageKey
+          )
+          languageDefaults.set(sentAt, forKey: Self.epdLastSyncAtStorageKey)
+          epdProbePhase = .ready
+          epdSendMessage = trigger == .automatic ? "auto-success" : "success"
+          return
+        } catch {
+          finalError = error
+          await epdTransport?.disconnect()
+          if attempt == 0 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+          }
+        }
+      }
+      throw finalError ?? NRFEPDBluetoothError.notConnected
+    } catch {
+      let message =
+        (error as? LocalizedError)?.errorDescription
+        ?? error.localizedDescription
+      epdProbePhase = .failed(message)
+      // The failure is already presented in the section header.
+      epdSendMessage = nil
+    }
+  }
+
+  private func refreshUsageForEPD() async throws {
+    if isRefreshing {
+      while isRefreshing {
+        try Task.checkCancellation()
+        try await Task.sleep(nanoseconds: 100_000_000)
+      }
+    } else if lastUpdated.map({ Date().timeIntervalSince($0) >= 30 }) ?? true {
+      await refresh()
+    }
+
+    if let errorMessage {
+      throw EPDLiveFrameError.usageRefreshFailed(errorMessage)
+    }
+    guard snapshot != nil else {
+      throw EPDLiveFrameError.missingUsageData
+    }
+  }
+
+  private func connectAndSendEPD(
+    _ frame: EPDFrame,
+    using epdTransport: NRFEPDBluetoothTransport
+  ) async throws {
+    let device = try await connectToRememberedOrDiscoveredEPD(
+      using: epdTransport
+    )
+    epdProbePhase = .reading(device.name)
+    let information = try await epdTransport.waitForInformation()
+    receiveEPDInformation(information)
+    guard information.isStandardThreeColorDisplay else {
+      throw NRFEPDBluetoothError.unsupportedDisplay(
+        information.driverDescription
+      )
+    }
+    try await epdTransport.send(frame: frame)
+  }
+
+  private func connectToRememberedOrDiscoveredEPD(
+    using epdTransport: NRFEPDBluetoothTransport
+  ) async throws -> EPDDeviceDescriptor {
+    // Always connect from a fresh advertisement. This mirrors the vendor Web
+    // Bluetooth controller and avoids a stale peripheral retained across a
+    // battery removal or firmware wake cycle.
+    epdProbePhase = .scanning
+    let devices = try await epdTransport.scan()
+    let device = try selectEPDDevice(from: devices)
+    epdProbePhase = .connecting(device.name)
+    try await epdTransport.connect(to: device)
+    return device
+  }
+
+  func writeEPDDocumentationPreview(to path: String) throws {
+    let content = try makeEPDLiveContent(now: lastUpdated ?? Date())
+    try EPDLiveFrameRenderer.writePNG(
+      content,
+      to: URL(fileURLWithPath: path)
+    )
+  }
+
+  private func makeEPDLiveContent(now: Date) throws -> EPDLiveContent {
+    guard let snapshot else {
+      throw EPDLiveFrameError.missingUsageData
+    }
+    let buckets = DailyTokenSeries.sevenDaysEnding(
+      on: now,
+      buckets: snapshot.tokenUsage?.dailyBuckets ?? [],
+      timeZone: .current
+    )
+    return EPDLiveContent(
+      now: now,
+      updatedAt: lastUpdated ?? now,
+      remainingPercent: snapshot.remainingPercent,
+      resetsAt: snapshot.resetsAt,
+      lifetimeTokens: snapshot.tokenUsage?.lifetimeTokens,
+      dailyTokenUsage: buckets.map {
+        SharedDailyTokenUsage(
+          startDate: $0.startDate,
+          tokens: $0.tokens
+        )
+      }
+    )
+  }
+
+  private func makeEPDTransport() -> NRFEPDBluetoothTransport {
+    if let epdTransport {
+      return epdTransport
+    }
+    let transport = NRFEPDBluetoothTransport()
+    transport.informationDidChange = { [weak self] information in
+      self?.receiveEPDInformation(information)
+    }
+    epdTransport = transport
+    return transport
+  }
+
+  private func receiveEPDInformation(_ information: NRFEPDDeviceInformation) {
+    epdInformation = information
+    languageDefaults.set(
+      information.device.id,
+      forKey: Self.epdDeviceIDStorageKey
+    )
+    languageDefaults.set(
+      information.device.name,
+      forKey: Self.epdDeviceNameStorageKey
+    )
+    if let firmwareVersion = information.firmwareVersion {
+      languageDefaults.set(
+        Int(firmwareVersion),
+        forKey: Self.epdFirmwareStorageKey
+      )
+    } else {
+      languageDefaults.removeObject(forKey: Self.epdFirmwareStorageKey)
+    }
+    if let driverID = information.driverID {
+      languageDefaults.set(Int(driverID), forKey: Self.epdDriverStorageKey)
+    } else {
+      languageDefaults.removeObject(forKey: Self.epdDriverStorageKey)
+    }
+    if let pinConfiguration = information.pinConfiguration {
+      languageDefaults.set(
+        pinConfiguration,
+        forKey: Self.epdPinConfigurationStorageKey
+      )
+    } else {
+      languageDefaults.removeObject(
+        forKey: Self.epdPinConfigurationStorageKey
+      )
+    }
+    if let reportedMTU = information.reportedMTU {
+      languageDefaults.set(reportedMTU, forKey: Self.epdMTUStorageKey)
+    } else {
+      languageDefaults.removeObject(forKey: Self.epdMTUStorageKey)
+    }
+    languageDefaults.set(
+      information.supportsRLE,
+      forKey: Self.epdRLEStorageKey
+    )
+  }
+
+  private func restoreEPDState() {
+    lastEPDCheckAt =
+      languageDefaults.object(
+        forKey: Self.epdLastCheckAtStorageKey
+      ) as? Date
+    lastEPDSyncAt =
+      languageDefaults.object(
+        forKey: Self.epdLastSyncAtStorageKey
+      ) as? Date
+    lastEPDFrameFingerprint = languageDefaults.string(
+      forKey: Self.epdLastFrameFingerprintStorageKey
+    )
+
+    guard
+      let id = languageDefaults.string(forKey: Self.epdDeviceIDStorageKey),
+      let name = languageDefaults.string(forKey: Self.epdDeviceNameStorageKey)
+    else { return }
+
+    let firmware =
+      (languageDefaults.object(
+        forKey: Self.epdFirmwareStorageKey
+      ) as? NSNumber)?.uint8Value
+    let driver =
+      (languageDefaults.object(
+        forKey: Self.epdDriverStorageKey
+      ) as? NSNumber)?.uint8Value
+    let mtu =
+      (languageDefaults.object(
+        forKey: Self.epdMTUStorageKey
+      ) as? NSNumber)?.intValue
+    epdInformation = NRFEPDDeviceInformation(
+      device: EPDDeviceDescriptor(id: id, name: name),
+      firmwareVersion: firmware,
+      driverID: driver,
+      pinConfiguration: languageDefaults.data(
+        forKey: Self.epdPinConfigurationStorageKey
+      ),
+      reportedMTU: mtu,
+      supportsRLE: languageDefaults.bool(forKey: Self.epdRLEStorageKey)
+    )
+    epdProbePhase = .ready
+  }
+
+  private func selectEPDDevice(
+    from devices: [EPDDeviceDescriptor]
+  ) throws -> EPDDeviceDescriptor {
+    guard !devices.isEmpty else {
+      throw NRFEPDBluetoothError.noCompatibleDevice
+    }
+
+    if let rememberedID = epdInformation?.device.id,
+      let remembered = devices.first(where: { $0.id == rememberedID })
+    {
+      return remembered
+    }
+
+    let preferred = devices.filter {
+      NRFEPDDiscoveryPolicy.isPreferred8042($0.name)
+    }
+    if preferred.count == 1, let device = preferred.first {
+      return device
+    }
+    if let strongest = NRFEPDDiscoveryPolicy.clearlyStrongest(in: preferred) {
+      return strongest
+    }
+    if devices.count == 1, let device = devices.first {
+      return device
+    }
+    if let strongest = NRFEPDDiscoveryPolicy.clearlyStrongest(in: devices) {
+      return strongest
+    }
+    throw NRFEPDBluetoothError.multipleCompatibleDevices(
+      devices.map(\.name)
+    )
+  }
+
   private func restoreCachedSnapshot() {
     guard let cached = sharedUsageStore.load(),
       UsageSubscription.resolve(cached.subscriptionID) == selectedSubscription
     else {
       return
-    }
-
-    let fiveHourWindow: UsageSubWindow?
-    if let usedPercent = cached.fiveHourUsedPercent {
-      fiveHourWindow = UsageSubWindow(
-        usedPercent: usedPercent,
-        windowDurationMinutes: 5 * 60,
-        resetsAt: cached.fiveHourResetsAt
-      )
-    } else {
-      fiveHourWindow = nil
     }
 
     snapshot = UsageSnapshot(
@@ -229,7 +573,23 @@ final class UsageViewModel: ObservableObject {
       planType: cached.planType,
       limitName: cached.limitName,
       reachedLimitType: nil,
-      fiveHourWindow: fiveHourWindow
+      additionalWindows: (cached.additionalWindows ?? []).map {
+        UsageWindow(
+          id: $0.id,
+          label: $0.label,
+          usedPercent: $0.usedPercent,
+          windowDurationMinutes: $0.windowDurationMinutes,
+          resetsAt: $0.resetsAt
+        )
+      },
+      tokenUsage: TokenUsage(
+        lifetimeTokens: cached.lifetimeTokens,
+        peakDailyTokens: nil,
+        currentStreakDays: nil,
+        dailyBuckets: (cached.dailyTokenUsage ?? []).map {
+          DailyTokenUsage(startDate: $0.startDate, tokens: $0.tokens)
+        }
+      )
     )
     lastUpdated = cached.updatedAt
   }
@@ -239,80 +599,57 @@ final class UsageViewModel: ObservableObject {
   ) {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 8 * 60 * 60) ?? .current
-
-    selectedSubscription = subscription
-    switch subscription {
-    case .codex:
-      snapshot = UsageSnapshot(
-        usedPercent: 64,
-        windowDurationMinutes: 10_080,
-        resetsAt: calendar.date(
-          from: DateComponents(
-            year: 2026,
-            month: 8,
-            day: 2,
-            hour: 12,
-            minute: 30
-          )
-        ),
-        planType: "pro",
-        limitName: "Codex",
-        reachedLimitType: nil,
-        fiveHourWindow: UsageSubWindow(
-          usedPercent: 45,
-          windowDurationMinutes: 300,
-          resetsAt: calendar.date(
-            from: DateComponents(
-              year: 2026,
-              month: 7,
-              day: 27,
-              hour: 15,
-              minute: 30
-            )
-          )
+    let previewDate = Date()
+    let previewValues: [Int64] = [
+      420_000, 760_000, 510_000, 1_240_000, 900_000, 1_520_000, 680_000,
+    ]
+    let dateFormatter = DateFormatter()
+    dateFormatter.calendar = calendar
+    dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+    dateFormatter.timeZone = calendar.timeZone
+    dateFormatter.dateFormat = "yyyy-MM-dd"
+    let previewBuckets = zip(-6...0, previewValues).compactMap {
+      offset, tokens -> DailyTokenUsage? in
+      guard
+        let day = calendar.date(
+          byAdding: .day,
+          value: offset,
+          to: previewDate
         )
-      )
-    case .k3:
-      snapshot = UsageSnapshot(
-        usedPercent: 21,
-        windowDurationMinutes: 0,
-        resetsAt: calendar.date(
-          from: DateComponents(
-            year: 2026,
-            month: 7,
-            day: 31,
-            hour: 11,
-            minute: 22
-          )
-        ),
-        planType: "intermediate",
-        limitName: "K3",
-        reachedLimitType: nil,
-        fiveHourWindow: UsageSubWindow(
-          usedPercent: 50,
-          windowDurationMinutes: 300,
-          resetsAt: calendar.date(
-            from: DateComponents(
-              year: 2026,
-              month: 7,
-              day: 31,
-              hour: 10,
-              minute: 22
-            )
-          )
-        )
+      else { return nil }
+      return DailyTokenUsage(
+        startDate: dateFormatter.string(from: day),
+        tokens: tokens
       )
     }
-    lastUpdated = calendar.date(
-      from: DateComponents(
-        year: 2026,
-        month: 7,
-        day: 27,
-        hour: 10,
-        minute: 24,
-        second: 18
+
+    selectedSubscription = subscription
+    snapshot = UsageSnapshot(
+      usedPercent: 64,
+      windowDurationMinutes: 10_080,
+      resetsAt: calendar.date(byAdding: .day, value: 3, to: previewDate),
+      planType: "pro",
+      limitName: "Codex",
+      reachedLimitType: nil,
+      tokenUsage: TokenUsage(
+        lifetimeTokens: 12_485_920,
+        peakDailyTokens: 1_840_000,
+        currentStreakDays: 8,
+        dailyBuckets: previewBuckets
       )
     )
+    lastUpdated = previewDate
+    if let lastUpdated {
+      usageHistory = [12, 19, 27, 31, 43, 52, 64].enumerated().map {
+        index, percent in
+        UsageHistoryPoint(
+          date: lastUpdated.addingTimeInterval(
+            Double(index - 6) * 24 * 60 * 60
+          ),
+          usedPercent: Double(percent)
+        )
+      }
+    }
     errorMessage = nil
     isRefreshing = false
   }
@@ -323,9 +660,15 @@ final class UsageViewModel: ObservableObject {
     }
 
     refreshLoop = Task { [weak self] in
+      let interval = Self.refreshIntervalNanoseconds
+      var nextRefresh = DispatchTime.now().uptimeNanoseconds + interval
+
       while !Task.isCancelled {
         do {
-          try await Task.sleep(nanoseconds: 300_000_000_000)
+          let now = DispatchTime.now().uptimeNanoseconds
+          if now < nextRefresh {
+            try await Task.sleep(nanoseconds: nextRefresh - now)
+          }
         } catch {
           return
         }
@@ -333,12 +676,109 @@ final class UsageViewModel: ObservableObject {
           return
         }
         await self.refresh()
+
+        nextRefresh += interval
+        let now = DispatchTime.now().uptimeNanoseconds
+        if nextRefresh <= now {
+          nextRefresh = now + interval
+        }
       }
     }
   }
 
+  private func startEPDAutomaticSyncLoop() {
+    guard epdAutomaticSyncLoop == nil else { return }
+
+    epdAutomaticSyncLoop = Task { [weak self] in
+      while !Task.isCancelled {
+        guard let self else { return }
+        let now = Date()
+        if EPDSyncPolicy.automaticSyncIsDue(
+          now: now,
+          lastCheckAt: self.lastEPDCheckAt,
+          timeZone: .current
+        ) {
+          await self.synchronizeEPD(trigger: .automatic)
+        }
+
+        do {
+          try await Task.sleep(
+            nanoseconds: Self.epdSchedulerTickNanoseconds
+          )
+        } catch {
+          return
+        }
+      }
+    }
+  }
+
+  private func recordUsageHistory(
+    usedPercent: Double,
+    at date: Date
+  ) {
+    let cutoff = date.addingTimeInterval(-7 * 24 * 60 * 60)
+    usageHistory.removeAll { $0.date < cutoff }
+    usageHistory.append(
+      UsageHistoryPoint(
+        date: date,
+        usedPercent: min(100, max(0, usedPercent))
+      )
+    )
+
+    if usageHistory.count > 10_080 {
+      usageHistory.removeFirst(usageHistory.count - 10_080)
+    }
+    if let encoded = try? JSONEncoder().encode(usageHistory) {
+      languageDefaults.set(encoded, forKey: Self.usageHistoryStorageKey)
+    }
+  }
+
+  private static func loadUsageHistory(
+    from defaults: UserDefaults
+  ) -> [UsageHistoryPoint] {
+    guard
+      let data = defaults.data(forKey: usageHistoryStorageKey),
+      let values = try? JSONDecoder().decode(
+        [UsageHistoryPoint].self,
+        from: data
+      )
+    else {
+      return []
+    }
+    let cutoff = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+    return values.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
+  }
+
+  private static let usageHistoryStorageKey = "codex-usage-history-v1"
+  private static let epdDeviceIDStorageKey = "epd-device-id-v1"
+  private static let epdDeviceNameStorageKey = "epd-device-name-v1"
+  private static let epdFirmwareStorageKey = "epd-firmware-v1"
+  private static let epdDriverStorageKey = "epd-driver-v1"
+  private static let epdPinConfigurationStorageKey = "epd-pins-v1"
+  private static let epdMTUStorageKey = "epd-mtu-v1"
+  private static let epdRLEStorageKey = "epd-rle-v1"
+  private static let epdLastCheckAtStorageKey = "epd-last-check-at-v1"
+  private static let epdLastSyncAtStorageKey = "epd-last-sync-at-v1"
+  private static let epdLastFrameFingerprintStorageKey =
+    "epd-last-frame-fingerprint-v1"
+
   private func refreshLaunchAtLoginStatus() {
     launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+  }
+
+  private func ensureLaunchAtLoginEnabled() {
+    refreshLaunchAtLoginStatus()
+    guard !launchAtLoginEnabled else {
+      return
+    }
+
+    do {
+      try SMAppService.mainApp.register()
+      launchAtLoginErrorDetails = nil
+    } catch {
+      launchAtLoginErrorDetails = error.localizedDescription
+    }
+    refreshLaunchAtLoginStatus()
   }
 
   private func persistWidgetPreferences() {
@@ -408,8 +848,20 @@ final class UsageViewModel: ObservableObject {
       windowDurationMinutes: snapshot.windowDurationMinutes,
       languageCode: displayLanguage.rawValue,
       subscriptionID: selectedSubscription.rawValue,
-      fiveHourUsedPercent: snapshot.fiveHourWindow?.usedPercent,
-      fiveHourResetsAt: snapshot.fiveHourWindow?.resetsAt
+      additionalWindows: snapshot.additionalWindows.map {
+        SharedUsageWindow(
+          id: $0.id,
+          label: $0.label,
+          usedPercent: $0.usedPercent,
+          windowDurationMinutes: $0.windowDurationMinutes,
+          resetsAt: $0.resetsAt
+        )
+      },
+      dailyTokenUsage: recentDailyTokenUsage(
+        from: snapshot.tokenUsage?.dailyBuckets ?? [],
+        relativeTo: updatedAt
+      ),
+      lifetimeTokens: snapshot.tokenUsage?.lifetimeTokens
     )
 
     localUsageServer.update(sharedSnapshot)
@@ -421,6 +873,18 @@ final class UsageViewModel: ObservableObject {
     WidgetCenter.shared.reloadTimelines(
       ofKind: SharedUsageConfiguration.widgetKind
     )
+  }
+
+  private func recentDailyTokenUsage(
+    from buckets: [DailyTokenUsage],
+    relativeTo date: Date
+  ) -> [SharedDailyTokenUsage] {
+    DailyTokenSeries.sevenDaysEnding(on: date, buckets: buckets).map { bucket in
+      return SharedDailyTokenUsage(
+        startDate: bucket.startDate,
+        tokens: bucket.tokens
+      )
+    }
   }
 
 }

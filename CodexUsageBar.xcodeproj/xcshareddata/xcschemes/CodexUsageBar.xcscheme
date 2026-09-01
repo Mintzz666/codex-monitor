@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "7116BD6E90ECC98E32301B1B"
-               BuildableName = "CodexUsageBar.app"
+               BuildableName = "Codex Monitor.app"
                BlueprintName = "CodexUsageBar"
                ReferencedContainer = "container:CodexUsageBar.xcodeproj">
             </BuildableReference>
@@ -58,7 +58,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "72DC45FD1BD7A4E5E5A44DF7"
-               BuildableName = "CodexUsageWidget.appex"
+               BuildableName = "CodexMonitorWidget.appex"
                BlueprintName = "CodexUsageWidget"
                ReferencedContainer = "container:CodexUsageBar.xcodeproj">
             </BuildableReference>
@@ -75,7 +75,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7116BD6E90ECC98E32301B1B"
-            BuildableName = "CodexUsageBar.app"
+            BuildableName = "Codex Monitor.app"
             BlueprintName = "CodexUsageBar"
             ReferencedContainer = "container:CodexUsageBar.xcodeproj">
          </BuildableReference>
@@ -98,7 +98,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7116BD6E90ECC98E32301B1B"
-            BuildableName = "CodexUsageBar.app"
+            BuildableName = "Codex Monitor.app"
             BlueprintName = "CodexUsageBar"
             ReferencedContainer = "container:CodexUsageBar.xcodeproj">
          </BuildableReference>
@@ -117,7 +117,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7116BD6E90ECC98E32301B1B"
-            BuildableName = "CodexUsageBar.app"
+            BuildableName = "Codex Monitor.app"
             BlueprintName = "CodexUsageBar"
             ReferencedContainer = "container:CodexUsageBar.xcodeproj">
          </BuildableReference>

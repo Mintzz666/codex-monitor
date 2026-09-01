@@ -11,12 +11,7 @@ let package = Package(
     .executable(name: "CodexUsageBar", targets: ["CodexUsageBar"]),
     .executable(name: "CodexUsageWidget", targets: ["CodexUsageWidget"]),
   ],
-  dependencies: [
-    .package(
-      url: "https://github.com/sparkle-project/Sparkle",
-      exact: "2.9.4"
-    )
-  ],
+  dependencies: [],
   targets: [
     .target(
       name: "CodexUsageCore",
@@ -31,7 +26,6 @@ let package = Package(
       dependencies: [
         "CodexUsageCore",
         "CodexUsageShared",
-        .product(name: "Sparkle", package: "Sparkle"),
       ],
       path: "Sources/CodexUsageBar"
     ),

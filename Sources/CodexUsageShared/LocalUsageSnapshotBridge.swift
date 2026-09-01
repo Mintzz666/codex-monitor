@@ -24,7 +24,7 @@ public struct LocalUsageSnapshotPayload: Codable, Equatable, Sendable {
 public final class LocalUsageSnapshotServer: @unchecked Sendable {
   private let ports: [NWEndpoint.Port]
   private let queue = DispatchQueue(
-    label: "io.cmmuu.codex-usage-bar.snapshot-server"
+    label: "com.example.codexmonitor.snapshot-server"
   )
   private let snapshotLock = NSLock()
 
@@ -211,7 +211,7 @@ public final class LocalUsageSnapshotClient: @unchecked Sendable {
   private let ports: [NWEndpoint.Port]
   private let timeout: TimeInterval
   private let queue = DispatchQueue(
-    label: "io.cmmuu.codex-usage-bar.snapshot-client"
+    label: "com.example.codexmonitor.snapshot-client"
   )
 
   public init(

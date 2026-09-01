@@ -8,64 +8,79 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 IGNORED_PARTS = {
+    ".DS_Store",
     ".git",
     ".build",
     ".swiftpm",
     ".wrangler",
     "dist",
     "node_modules",
-}
-IGNORED_SUFFIXES = {
-    ".a",
-    ".dylib",
-    ".gif",
-    ".icns",
-    ".jpeg",
-    ".jpg",
-    ".o",
-    ".pdf",
-    ".png",
-    ".swiftmodule",
-    ".zip",
+    "xcuserdata",
 }
 REQUIRED_PATHS = {
-    "LICENSE",
-    "README.md",
-    "README.zh-CN.md",
-    "CONTRIBUTING.md",
-    "SECURITY.md",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
-    "Package.resolved",
-    "Scripts/generate_appcast.sh",
-    "docs/images/menu-bar-app-en.png",
-    "docs/images/menu-bar-app-zh-CN.png",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "NOTICE.md",
+    "Package.swift",
+    "README.md",
+    "README.zh-CN.md",
+    "SECURITY.md",
+    "Mobile/README.md",
+    "Scripts/package.sh",
+    "Scripts/release_package.sh",
+    "Sources/CodexUsageShared/EPDTransport.swift",
+    "Sources/CodexUsageShared/NRFEPDBluetoothTransport.swift",
+    "docs/architecture-and-privacy.md",
+    "docs/images/epd-live-preview.png",
+    "docs/images/mobile-v1.2-preview.png",
     "docs/images/usage-popover.png",
-    "docs/images/widgets-en.png",
-    "docs/images/widgets-zh-CN.png",
+    "docs/release-notes/v1.4.2.md",
+    "docs/setup-epd.md",
+    "docs/setup-ios.md",
+    "docs/setup-macos.md",
     "project.yml",
 }
+FORBIDDEN_SUFFIXES = {
+    ".cer",
+    ".key",
+    ".mobileprovision",
+    ".p12",
+    ".pem",
+}
+FORBIDDEN_NAMES = {
+    ".env",
+    ".netrc",
+    "id_ed25519",
+    "id_rsa",
+}
 FORBIDDEN_PATTERNS = {
-    "absolute macOS user path": re.compile(r"/Users/[A-Za-z0-9._-]+/"),
-    "private workspace path": re.compile(r"/opt/workspace"),
-    "OpenAI-style secret": re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),
-    "GitHub OAuth token": re.compile(r"\bgho_[A-Za-z0-9]{16,}\b"),
-    "private key": re.compile(r"BEGIN (?:RSA |OPENSSH )?PRIVATE KEY"),
-    "bearer credential": re.compile(r"Bearer\s+[A-Za-z0-9._~-]{20,}"),
+    "absolute macOS user path": re.compile(rb"/Users/[A-Za-z0-9._-]+/"),
+    "private workspace path": re.compile(rb"/opt/workspace"),
+    "OpenAI-style secret": re.compile(rb"\bsk-(?:proj-)?[A-Za-z0-9_-]{16,}\b"),
+    "GitHub token": re.compile(rb"\bgh[opusr]_[A-Za-z0-9]{16,}\b"),
+    "private key": re.compile(rb"BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY"),
+    "bearer credential": re.compile(rb"Bearer\s+[A-Za-z0-9._~-]{20,}"),
+    "personal bundle marker": re.compile(
+        rb"(?:com|group\.com)\.mintzz", re.IGNORECASE
+    ),
+    "personal email marker": re.compile(rb"baishuidream@gmail\.com", re.IGNORECASE),
+    "chat attachment path": re.compile(rb"(?:wxid_|xwechat_files)"),
+    "hard-coded Apple Team ID": re.compile(
+        rb"DEVELOPMENT_TEAM\s*=\s*[A-Z0-9]{10}"
+    ),
 }
 
 
-def iter_text_files() -> list[Path]:
+def iter_public_files() -> list[Path]:
     files: list[Path] = []
     this_script = Path(__file__).resolve()
     for path in ROOT.rglob("*"):
-        if not path.is_file():
+        if not path.is_file() or path.resolve() == this_script:
             continue
-        if path.resolve() == this_script:
-            continue
-        if any(part in IGNORED_PARTS for part in path.relative_to(ROOT).parts):
-            continue
-        if path.suffix.lower() in IGNORED_SUFFIXES:
+        relative = path.relative_to(ROOT)
+        if any(part in IGNORED_PARTS for part in relative.parts):
             continue
         files.append(path)
     return files
@@ -78,17 +93,21 @@ def main() -> int:
         if not (ROOT / relative_path).is_file():
             failures.append(f"missing required file: {relative_path}")
 
-    for path in iter_text_files():
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+    for path in iter_public_files():
+        relative = path.relative_to(ROOT)
+        if path.name in FORBIDDEN_NAMES or path.suffix.lower() in FORBIDDEN_SUFFIXES:
+            failures.append(f"{relative}: forbidden credential file")
             continue
 
-        relative_path = path.relative_to(ROOT)
+        try:
+            data = path.read_bytes()
+        except OSError as error:
+            failures.append(f"{relative}: could not read ({error})")
+            continue
+
         for label, pattern in FORBIDDEN_PATTERNS.items():
-            for match in pattern.finditer(text):
-                line = text.count("\n", 0, match.start()) + 1
-                failures.append(f"{relative_path}:{line}: {label}")
+            if pattern.search(data):
+                failures.append(f"{relative}: {label}")
 
     if failures:
         print("Public release check failed:", file=sys.stderr)
