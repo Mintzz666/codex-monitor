@@ -48,6 +48,7 @@ public enum NRFEPDBluetoothError: Error, Equatable, LocalizedError, Sendable {
   case noCompatibleDevice
   case multipleCompatibleDevices([String])
   case deviceUnavailable
+  case gattHandshakeTimeout
   case connectionFailed(String)
   case serviceUnavailable
   case characteristicUnavailable
@@ -66,6 +67,8 @@ public enum NRFEPDBluetoothError: Error, Equatable, LocalizedError, Sendable {
       return "Multiple NRF_EPD devices were found: \(names.joined(separator: ", "))"
     case .deviceUnavailable:
       return "The selected NRF_EPD device is no longer available"
+    case .gattHandshakeTimeout:
+      return "NRF_EPD was found, but its Bluetooth GATT handshake timed out"
     case .connectionFailed(let message):
       return "NRF_EPD connection failed: \(message)"
     case .serviceUnavailable:
@@ -86,6 +89,14 @@ public enum NRFEPDBluetoothError: Error, Equatable, LocalizedError, Sendable {
 
 @MainActor
 public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
+  private static let targetedScanNanoseconds: UInt64 = 8_000_000_000
+  private static let fallbackScanNanoseconds: UInt64 = 10_000_000_000
+  private static let scanPollNanoseconds: UInt64 = 100_000_000
+  // macOS may establish the radio link and retry the link-ready/GATT phase
+  // several times for this converted ESL firmware. Keep one CoreBluetooth
+  // request alive long enough for those controller-level retries instead of
+  // cancelling and starting over after the first failed handshake.
+  private static let connectionTimeoutNanoseconds: UInt64 = 60_000_000_000
   private static let serviceUUID = CBUUID(
     string: NRFEPDProtocol.serviceUUID
   )
@@ -108,7 +119,9 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
   private var connectContinuation: CheckedContinuation<Void, Error>?
   private var connectTimeoutTask: Task<Void, Never>?
   private var writeContinuation: CheckedContinuation<Void, Error>?
+  private var refreshCommandMayDisconnect = false
   private var currentInformation: NRFEPDDeviceInformation?
+  private var serviceFilteredScanIsActive = false
   private var transportState: EPDTransportState = .idle {
     didSet { stateDidChange?(transportState) }
   }
@@ -124,16 +137,30 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
 
   public func scan() async throws -> [EPDDeviceDescriptor] {
     try await waitForBluetooth()
+    if centralManager.isScanning {
+      centralManager.stopScan()
+    }
     discoveredPeripherals.removeAll()
     discoveredDescriptors.removeAll()
     transportState = .scanning
 
-    centralManager.scanForPeripherals(
-      withServices: nil,
-      options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
-    )
-    try await Task.sleep(nanoseconds: 5_000_000_000)
-    centralManager.stopScan()
+    // Match the known-good Web Bluetooth flow: obtain a fresh advertisement
+    // by name and connect to that exact peripheral. A cached CoreBluetooth
+    // peripheral can survive while the converted tag has rebooted.
+    if discoveredDescriptors.isEmpty {
+      try await performScan(
+        withServices: nil,
+        durationNanoseconds: Self.fallbackScanNanoseconds,
+        stopWhenPreferred8042IsFound: true
+      )
+    }
+    if discoveredDescriptors.isEmpty {
+      try await performScan(
+        withServices: [Self.serviceUUID],
+        durationNanoseconds: Self.targetedScanNanoseconds,
+        stopWhenPreferred8042IsFound: false
+      )
+    }
 
     if case .scanning = transportState {
       transportState = .idle
@@ -154,6 +181,11 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
     guard let peripheral else {
       throw NRFEPDBluetoothError.deviceUnavailable
     }
+    if device.isConnectable == false {
+      throw NRFEPDBluetoothError.connectionFailed(
+        "device is advertising but not connectable; another phone or computer may still be connected"
+      )
+    }
     discoveredPeripherals[identifier] = peripheral
     discoveredDescriptors[identifier] = device
 
@@ -163,16 +195,19 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
 
     currentInformation = NRFEPDDeviceInformation(device: device)
     connectedPeripheral = peripheral
+    dataCharacteristic = nil
+    versionCharacteristic = nil
     peripheral.delegate = self
     transportState = .connecting(deviceID: device.id)
 
     try await withCheckedThrowingContinuation { continuation in
       connectContinuation = continuation
-      centralManager.connect(peripheral)
       connectTimeoutTask?.cancel()
       connectTimeoutTask = Task { [weak self, weak peripheral] in
         do {
-          try await Task.sleep(nanoseconds: 12_000_000_000)
+          try await Task.sleep(
+            nanoseconds: Self.connectionTimeoutNanoseconds
+          )
         } catch {
           return
         }
@@ -182,8 +217,13 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
         }
         self.transportState = .failed(message: "connection timed out")
         self.finishConnection(
-          with: NRFEPDBluetoothError.connectionFailed("timed out")
+          with: NRFEPDBluetoothError.gattHandshakeTimeout
         )
+      }
+      if peripheral.state == .connected {
+        peripheral.discoverServices([Self.serviceUUID])
+      } else {
+        centralManager.connect(peripheral)
       }
     }
   }
@@ -267,9 +307,17 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
         )
       }
     }
+    // This converted tag starts the physical refresh and may immediately drop
+    // its BLE link before macOS delivers the final write acknowledgement. Once
+    // every plane packet is acknowledged, that disconnect is a successful
+    // refresh completion signal rather than a failed image transfer.
+    refreshCommandMayDisconnect = true
+    defer { refreshCommandMayDisconnect = false }
     try await writeWithResponse(Data([NRFEPDProtocol.refreshCommand]))
     try await Task.sleep(nanoseconds: 50_000_000)
-    transportState = .connected(deviceID: deviceID)
+    transportState =
+      peripheral.state == .connected
+      ? .connected(deviceID: deviceID) : .idle
   }
 
   public func disconnect() async {
@@ -278,6 +326,7 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
     }
     finishConnection(with: NRFEPDBluetoothError.notConnected)
     finishWrite(with: NRFEPDBluetoothError.notConnected)
+    refreshCommandMayDisconnect = false
     connectedPeripheral = nil
     dataCharacteristic = nil
     versionCharacteristic = nil
@@ -303,6 +352,54 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
       }
     }
     throw NRFEPDBluetoothError.bluetoothUnavailable("initialization timeout")
+  }
+
+  private func addConnectedPeripherals() {
+    for peripheral in centralManager.retrieveConnectedPeripherals(
+      withServices: [Self.serviceUUID]
+    ) {
+      let name =
+        peripheral.name
+        ?? discoveredDescriptors[peripheral.identifier]?.name
+        ?? "NRF_EPD device"
+      discoveredPeripherals[peripheral.identifier] = peripheral
+      discoveredDescriptors[peripheral.identifier] = EPDDeviceDescriptor(
+        id: peripheral.identifier.uuidString,
+        name: name,
+        isConnectable: true
+      )
+    }
+  }
+
+  private func performScan(
+    withServices services: [CBUUID]?,
+    durationNanoseconds: UInt64,
+    stopWhenPreferred8042IsFound: Bool
+  ) async throws {
+    serviceFilteredScanIsActive = services != nil
+    centralManager.scanForPeripherals(
+      withServices: services,
+      options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
+    )
+    defer {
+      centralManager.stopScan()
+      serviceFilteredScanIsActive = false
+    }
+
+    let deadline = ContinuousClock.now.advanced(
+      by: .nanoseconds(Int64(durationNanoseconds))
+    )
+    while ContinuousClock.now < deadline {
+      try await Task.sleep(nanoseconds: Self.scanPollNanoseconds)
+      if stopWhenPreferred8042IsFound,
+        discoveredDescriptors.values.contains(where: {
+          NRFEPDDiscoveryPolicy.isPreferred8042($0.name)
+            && $0.isConnectable != false
+        })
+      {
+        return
+      }
+    }
   }
 
   private func writeWithResponse(_ value: Data) async throws {
@@ -393,17 +490,64 @@ extension NRFEPDBluetoothTransport: @preconcurrency CBCentralManagerDelegate {
     let advertisedName =
       advertisementData[CBAdvertisementDataLocalNameKey]
       as? String
-    let name = advertisedName ?? peripheral.name ?? "Unknown BLE device"
-    let normalizedName = name.uppercased()
-    guard normalizedName.contains("NRF_EPD") || normalizedName.hasPrefix("EPD_")
+    let advertisesService =
+      serviceFilteredScanIsActive
+      || Self.advertisedServiceUUIDs(in: advertisementData).contains(
+        Self.serviceUUID
+      )
+    let candidateName = advertisedName ?? peripheral.name
+    guard
+      NRFEPDDiscoveryPolicy.shouldAccept(
+        name: candidateName,
+        advertisesService: advertisesService
+      )
     else { return }
+
+    let existing = discoveredDescriptors[peripheral.identifier]
+    let name =
+      candidateName
+      ?? existing?.name
+      ?? "NRF_EPD device"
+    let observedSignalStrength = NRFEPDDiscoveryPolicy.validSignalStrength(
+      rssi.intValue
+    )
+    let signalStrength = [observedSignalStrength, existing?.signalStrength]
+      .compactMap { $0 }
+      .max()
+    let observedConnectability =
+      (advertisementData[CBAdvertisementDataIsConnectable] as? NSNumber)?
+      .boolValue
+    let isConnectable = observedConnectability ?? existing?.isConnectable
 
     discoveredPeripherals[peripheral.identifier] = peripheral
     discoveredDescriptors[peripheral.identifier] = EPDDeviceDescriptor(
       id: peripheral.identifier.uuidString,
       name: name,
-      signalStrength: rssi.intValue
+      signalStrength: signalStrength,
+      isConnectable: isConnectable
     )
+  }
+
+  private static func advertisedServiceUUIDs(
+    in advertisementData: [String: Any]
+  ) -> Set<CBUUID> {
+    var result = Set<CBUUID>()
+    for key in [
+      CBAdvertisementDataServiceUUIDsKey,
+      CBAdvertisementDataOverflowServiceUUIDsKey,
+      CBAdvertisementDataSolicitedServiceUUIDsKey,
+    ] {
+      if let values = advertisementData[key] as? [CBUUID] {
+        result.formUnion(values)
+      }
+    }
+    if let serviceData =
+      advertisementData[CBAdvertisementDataServiceDataKey]
+      as? [CBUUID: Data]
+    {
+      result.formUnion(serviceData.keys)
+    }
+    return result
   }
 
   public func centralManager(
@@ -441,7 +585,11 @@ extension NRFEPDBluetoothTransport: @preconcurrency CBCentralManagerDelegate {
     finishConnection(
       with: NRFEPDBluetoothError.connectionFailed(message)
     )
-    finishWrite(with: NRFEPDBluetoothError.writeFailed(message))
+    if refreshCommandMayDisconnect {
+      finishWrite()
+    } else {
+      finishWrite(with: NRFEPDBluetoothError.writeFailed(message))
+    }
   }
 }
 
@@ -567,11 +715,15 @@ extension NRFEPDBluetoothTransport: @preconcurrency CBPeripheralDelegate {
     error: Error?
   ) {
     if let error {
-      finishWrite(
-        with: NRFEPDBluetoothError.writeFailed(
-          error.localizedDescription
+      if refreshCommandMayDisconnect {
+        finishWrite()
+      } else {
+        finishWrite(
+          with: NRFEPDBluetoothError.writeFailed(
+            error.localizedDescription
+          )
         )
-      )
+      }
     } else {
       finishWrite()
     }

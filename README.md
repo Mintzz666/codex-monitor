@@ -2,11 +2,10 @@
 
 [简体中文](README.zh-CN.md)
 
-Codex Monitor is an unofficial, local-first dashboard for Codex usage. One
-repository contains three independently usable surfaces:
+Codex Monitor is an unofficial, local-first dashboard for Codex usage. It focuses on
+the Mac, with these surfaces:
 
 - a native macOS menu bar app with medium and large WidgetKit widgets;
-- an iPhone app with a small interactive WidgetKit widget;
 - a 400 × 300 black/white/red Bluetooth e-paper dashboard for
   `NRF_EPD_8042` hardware.
 
@@ -20,7 +19,6 @@ repository contains three independently usable surfaces:
 |---|---|---|
 | macOS menu | locally launched `codex app-server` | every minute |
 | macOS widgets | sanitized App Group snapshot, with a loopback fallback for ad-hoc builds | WidgetKit timeline |
-| iPhone widget | independent OpenAI device authorization and account-usage request | every 15 minutes + button |
 | Bluetooth EPD | frame rendered by the macOS app | hourly check, forced after midnight |
 
 The EPD connection is intentionally short lived. Codex Monitor hashes the
@@ -35,20 +33,12 @@ write is retried once.
 1. Download the DMG from [Releases](https://github.com/Mintzz666/codex-monitor/releases).
 2. Drag **Codex Monitor** to `/Applications`.
 3. Make sure the official Codex CLI/app is installed and signed in.
-4. Start Codex Monitor. It refreshes locally and enables launch at login.
+4. Start Codex Monitor. It refreshes locally and offers launch at login.
+   Disabling launch at login is remembered across restarts.
 
 Community DMGs are ad-hoc signed unless a maintainer supplies Apple signing and
 notarization credentials. If Gatekeeper blocks the first launch, right-click the
 app and choose **Open**, or build it from source.
-
-### iPhone app and widget
-
-The iPhone target must be built with your own Apple Development team. Replace
-the example bundle, App Group, and Keychain identifiers first, open
-`Mobile/CodexMonitorMobile.xcodeproj`, run on a physical iPhone, complete device
-authorization, then add the **Codex Monitor** small widget.
-
-See [iPhone reproduction guide](docs/setup-ios.md).
 
 ### Bluetooth e-paper dashboard
 
@@ -84,7 +74,6 @@ values unique to your team, then regenerate the projects:
 ```sh
 brew install xcodegen
 make xcode-project
-(cd Mobile && xcodegen generate --spec project.yml)
 ```
 
 Full instructions: [macOS build guide](docs/setup-macos.md).
@@ -96,19 +85,12 @@ uses `account/read`, `account/rateLimits/read`, and `account/usage/read`.
 Authentication and refresh-token handling remain inside Codex. The app does
 not read browser cookies or copy Codex credentials.
 
-On iPhone, authentication is independent. OAuth credentials are stored only in
-an iOS Keychain access group configured for the app and widget. The App Group
-contains only a non-sensitive quota snapshot. The mobile usage endpoint follows
-the official open-source Codex implementation but is not a separately
-documented third-party API, so upstream compatibility may change.
-
 No analytics, advertising SDK, cloud database, or developer-operated backend is
 included. See [architecture and privacy](docs/architecture-and-privacy.md).
 
 ## Reproduction map
 
 - [macOS app and widgets](docs/setup-macos.md)
-- [iPhone app and widget](docs/setup-ios.md)
 - [Bluetooth EPD dashboard](docs/setup-epd.md)
 - [architecture, data flow, and privacy](docs/architecture-and-privacy.md)
 - [release process](docs/releasing.md)

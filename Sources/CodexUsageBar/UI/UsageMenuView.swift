@@ -377,6 +377,17 @@ struct UsageMenuView: View {
 
         Spacer()
 
+        Button {
+          Task { await viewModel.refresh() }
+        } label: {
+          Label(
+            language == .simplifiedChinese ? "刷新" : "Refresh",
+            systemImage: "arrow.clockwise"
+          )
+        }
+        .keyboardShortcut("r")
+        .disabled(viewModel.isRefreshing)
+
         Button(language.text(.quit)) {
           NSApplication.shared.terminate(nil)
         }
@@ -435,6 +446,15 @@ struct UsageMenuView: View {
       }
 
       if let information = viewModel.epdInformation {
+        if case .failed = viewModel.epdProbePhase {
+          Text(
+            language == .simplifiedChinese
+              ? "设备信息已缓存；当前蓝牙连接已结束。"
+              : "Device information is cached; Bluetooth is currently disconnected."
+          )
+          .font(.system(size: 9))
+          .foregroundStyle(.orange)
+        }
         HStack(spacing: 12) {
           epdMetric(
             title: language == .simplifiedChinese ? "设备" : "Device",
@@ -451,8 +471,10 @@ struct UsageMenuView: View {
             value: information.reportedMTU.map(String.init) ?? "—"
           )
           epdMetric(
-            title: "RLE",
-            value: information.supportsRLE ? "✓" : "—"
+            title: language == .simplifiedChinese ? "信号" : "Signal",
+            value: information.device.signalStrength.map {
+              "\($0) dBm"
+            } ?? "—"
           )
         }
         Text(information.driverDescription)
@@ -548,8 +570,18 @@ struct UsageMenuView: View {
         ? "设备已记住，空闲时蓝牙断开"
         : "Device remembered; Bluetooth is idle"
     case .failed(let message):
-      return message
+      return epdFailureDisplayText(message)
     }
+  }
+
+  private func epdFailureDisplayText(_ message: String) -> String {
+    guard
+      message
+        == NRFEPDBluetoothError.gattHandshakeTimeout.errorDescription
+    else { return message }
+    return language == .simplifiedChinese
+      ? "仅扫描到设备广播，BLE 链路未建立；本次无法更新画面。"
+      : "Advertisement found, but no BLE link was established; this update cannot proceed."
   }
 
   private var epdStatusSymbol: String {
@@ -589,7 +621,7 @@ struct UsageMenuView: View {
         ? "设备检测完成，蓝牙已断开。"
         : "Probe complete; Bluetooth disconnected."
     default:
-      return message
+      return epdFailureDisplayText(message)
     }
   }
 

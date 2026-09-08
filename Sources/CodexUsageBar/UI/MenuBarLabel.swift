@@ -35,8 +35,16 @@ final class StatusBarController: NSObject {
         set: { self.viewModel.setDisplayLanguage($0) }
       )
     )
-    popover.contentViewController = NSHostingController(rootView: content)
-    popover.contentSize = NSSize(width: 366, height: 780)
+    let availableHeight =
+      statusItem.button?.window?.screen?.visibleFrame.height
+      ?? NSScreen.main?.visibleFrame.height ?? 900
+    let height = min(780, max(240, availableHeight - 40))
+    let scrollableContent = ScrollView(.vertical) {
+      content.fixedSize(horizontal: false, vertical: true)
+    }
+    .frame(width: 366, height: height)
+    popover.contentViewController = NSHostingController(rootView: scrollableContent)
+    popover.contentSize = NSSize(width: 366, height: height)
     popover.behavior = .transient
     popover.animates = true
   }
@@ -56,12 +64,14 @@ final class StatusBarController: NSObject {
   }
 
   private func observeUsage() {
-    Publishers.CombineLatest(
+    Publishers.CombineLatest4(
       viewModel.$snapshot,
-      viewModel.$isRefreshing
+      viewModel.$isRefreshing,
+      viewModel.$displayLanguage,
+      viewModel.$errorMessage
     )
     .receive(on: RunLoop.main)
-    .sink { [weak self] _, _ in
+    .sink { [weak self] _, _, _, _ in
       self?.updateStatusButton()
     }
     .store(in: &cancellables)
@@ -70,7 +80,12 @@ final class StatusBarController: NSObject {
   private func updateStatusButton() {
     guard let button = statusItem.button else { return }
     button.title = " \(viewModel.menuBarText)"
-    button.toolTip = viewModel.displayLanguage.text(.menuBarAccessibility)
+    let language = viewModel.displayLanguage
+    let status =
+      viewModel.errorDisplayText(for: language)
+      ?? viewModel.lastUpdatedDisplayText(for: language)
+    button.toolTip = "\(language.text(.menuBarAccessibility)) · \(viewModel.menuBarText)\n\(status)"
+    button.appearsDisabled = viewModel.errorMessage != nil
     button.setAccessibilityLabel(
       viewModel.displayLanguage.text(.menuBarAccessibility)
     )
@@ -82,6 +97,9 @@ final class StatusBarController: NSObject {
     if popover.isShown {
       popover.performClose(nil)
     } else {
+      configurePopover()
+      viewModel.refreshLaunchAtLoginStatus()
+      Task { await viewModel.refreshIfStale() }
       popover.show(
         relativeTo: button.bounds,
         of: button,
@@ -93,10 +111,15 @@ final class StatusBarController: NSObject {
 
   private static let statusImage: NSImage = {
     let image =
-      NSImage(
+      Bundle.main.url(
+        forResource: "OfficialCodexMenuTemplate",
+        withExtension: "png"
+      ).flatMap(NSImage.init(contentsOf:))
+      ?? NSImage(
         systemSymbolName: "terminal",
         accessibilityDescription: nil
-      ) ?? NSImage()
+      )
+      ?? NSImage()
     image.size = NSSize(width: 16, height: 16)
     image.isTemplate = true
     return image

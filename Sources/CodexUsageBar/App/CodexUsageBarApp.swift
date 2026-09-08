@@ -1,5 +1,7 @@
 import AppKit
 import CodexUsageShared
+import Combine
+import Darwin
 import SwiftUI
 
 @main
@@ -17,6 +19,7 @@ struct CodexUsageBarApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private let viewModel = UsageViewModel()
   private var statusBarController: StatusBarController?
+  private var wakeObserver: AnyCancellable?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApplication.shared.setActivationPolicy(.accessory)
@@ -26,12 +29,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
+    if epdProbeRequested {
+      runEPDHardwareProbe()
+      return
+    }
+
     if let documentationSnapshotPath {
       renderDocumentationSnapshot(to: documentationSnapshotPath)
       return
     }
 
     statusBarController = StatusBarController(viewModel: viewModel)
+    wakeObserver = NSWorkspace.shared.notificationCenter
+      .publisher(for: NSWorkspace.didWakeNotification)
+      .receive(on: RunLoop.main)
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in
+          await self?.viewModel.refreshIfStale()
+        }
+      }
     Task {
       await viewModel.activate()
     }
@@ -47,6 +63,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ProcessInfo.processInfo.environment[
       "CODEX_USAGE_BAR_EPD_SNAPSHOT"
     ]
+  }
+
+  private var epdProbeRequested: Bool {
+    ProcessInfo.processInfo.environment[
+      "CODEX_USAGE_BAR_EPD_PROBE"
+    ] == "1"
   }
 
   private var documentationLanguage: AppLanguage {
@@ -93,5 +115,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       fputs("EPD snapshot failed: \(error)\n", stderr)
     }
     NSApplication.shared.terminate(nil)
+  }
+
+  private func runEPDHardwareProbe() {
+    Task {
+      let transport = NRFEPDBluetoothTransport()
+      do {
+        writeProbeLine("EPD probe: scanning")
+        let devices = try await transport.scan()
+        writeProbeLine("EPD probe: found \(devices.count) compatible device(s)")
+        for device in devices {
+          let signal = device.signalStrength.map { "\($0) dBm" } ?? "unknown RSSI"
+          let connectability =
+            device.isConnectable.map {
+              $0 ? "connectable" : "not connectable"
+            } ?? "connectability unknown"
+          writeProbeLine("- \(device.name): \(signal), \(connectability)")
+        }
+
+        if let target = preferredProbeDevice(from: devices) {
+          writeProbeLine("EPD probe: connecting to \(target.name)")
+          try await transport.connect(to: target)
+          let information = try await transport.waitForInformation(
+            timeoutNanoseconds: 8_000_000_000
+          )
+          writeProbeLine(
+            "EPD probe: connected; \(information.driverDescription)"
+          )
+        }
+      } catch {
+        let message =
+          (error as? LocalizedError)?.errorDescription
+          ?? error.localizedDescription
+        writeProbeLine("EPD probe failed: \(message)")
+      }
+      await transport.disconnect()
+      exit(EXIT_SUCCESS)
+    }
+  }
+
+  private func preferredProbeDevice(
+    from devices: [EPDDeviceDescriptor]
+  ) -> EPDDeviceDescriptor? {
+    let preferred = devices.filter {
+      NRFEPDDiscoveryPolicy.isPreferred8042($0.name)
+    }
+    let candidates = preferred.isEmpty ? devices : preferred
+    return candidates.sorted {
+      ($0.signalStrength ?? Int.min) > ($1.signalStrength ?? Int.min)
+    }.first
+  }
+
+  private func writeProbeLine(_ message: String) {
+    guard let data = "\(message)\n".data(using: .utf8) else { return }
+    FileHandle.standardOutput.write(data)
   }
 }

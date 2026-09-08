@@ -415,6 +415,46 @@ struct CodexUsageVerifier {
   }
 
   private static func verifyEPDTransportBoundary() throws {
+    try expect(
+      NRFEPDDiscoveryPolicy.nameLooksCompatible("NRF_EPD_8042")
+        && NRFEPDDiscoveryPolicy.nameLooksCompatible("nrf-epd-8042")
+        && NRFEPDDiscoveryPolicy.nameLooksCompatible("EPD 8042"),
+      "兼容墨水屏广播名中的大小写和分隔符差异"
+    )
+    try expect(
+      NRFEPDDiscoveryPolicy.shouldAccept(
+        name: nil,
+        advertisesService: true
+      )
+        && !NRFEPDDiscoveryPolicy.shouldAccept(
+          name: "Laboratory sensor",
+          advertisesService: false
+        ),
+      "接受只广播服务 UUID 的设备并过滤无关设备"
+    )
+    try expect(
+      NRFEPDDiscoveryPolicy.isPreferred8042("NRF EPD 8042")
+        && NRFEPDDiscoveryPolicy.validSignalStrength(127) == nil
+        && NRFEPDDiscoveryPolicy.validSignalStrength(-62) == -62,
+      "优先选择 8042 并忽略 CoreBluetooth 无效 RSSI"
+    )
+    let nearbyEPD = EPDDeviceDescriptor(
+      id: "nearby",
+      name: "NRF_EPD_8042",
+      signalStrength: -48
+    )
+    let distantEPD = EPDDeviceDescriptor(
+      id: "distant",
+      name: "NRF_EPD_8042",
+      signalStrength: -72
+    )
+    try expect(
+      NRFEPDDiscoveryPolicy.clearlyStrongest(
+        in: [distantEPD, nearbyEPD]
+      ) == nearbyEPD,
+      "多台同型号设备时仅选择明显更近的一台"
+    )
+
     let plane = Data(
       repeating: 0xFF,
       count: EPDFrame.standardPlaneByteCount

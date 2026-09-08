@@ -8,6 +8,14 @@
 - detected controller: SSD1619-compatible three-color driver (`0x02`)
 - transport: Bluetooth Low Energy
 
+The tested enclosure is labelled `ZKONG ZKC42V`. Its `NRF_EPD_8042`
+advertising name identifies the compatible BLE protocol, not necessarily a
+Nordic MCU. The 2024 FCC filing that includes ZKC42V in the same electrical
+platform shows a Goodix `GR5513BEND` controller in the reference internal
+photos. Third-party firmware ports of the EPD-nRF5 protocol also exist for
+ZKONG boards using GR5513-class controllers. Treat the exact MCU of an
+individual converted tag as unconfirmed until its own PCB marking is checked.
+
 Other `NRF_EPD` boards may be discovered, but Codex Monitor refuses to transmit
 unless the reported driver is one of the supported 4.2-inch three-color modes.
 
@@ -45,7 +53,11 @@ idle state.
   volatile footer time.
 - If unchanged: no BLE scan or connection.
 - If changed: connect, upload both 15,000-byte planes, refresh, disconnect.
-- Failure: disconnect and retry the entire BLE operation once.
+- Ordinary transient failure: disconnect and retry the entire BLE operation
+  once.
+- GATT handshake timeout after the device was found: disconnect without an
+  immediate second attempt. The next manual or hourly check can retry after the
+  peripheral has recovered.
 
 With the legacy 20-byte BLE write size, a full non-RLE upload can take roughly
 one to three minutes. Do not power-cycle the board during transfer.
@@ -83,14 +95,31 @@ python3 -m venv .venv-epd
 
 ## Troubleshooting / 故障排查
 
-- **No device found:** check power, distance, macOS Bluetooth permission, and
-  that the advertising name contains `NRF_EPD`.
+- **No device found:** check power and macOS Bluetooth permission, then make
+  sure no phone, browser controller, or second computer is still connected.
+  The app first performs a service-UUID-filtered scan and then a longer
+  name-based fallback scan, so discovery can take up to about 18 seconds in a
+  crowded RF environment.
+- **Crowded 2.4 GHz lab:** move the board and Mac away from USB 3 hubs,
+  unshielded cables, Wi-Fi access points, and metal instrument enclosures. A
+  short USB extension can move a Mac Bluetooth adapter or the board's power
+  lead away from a noisy hub without increasing BLE transmit power.
 - **Device disconnected:** leave it powered, retry once, and avoid simultaneous
   connections from a browser controller.
+- **Found at a strong RSSI but GATT handshake times out:** this is different
+  from a discovery failure. Test once with the upstream Web Bluetooth
+  controller. If both Codex Monitor and the upstream controller stop before a
+  GATT server is available, restart or re-wake the display and investigate its
+  firmware/hardware rather than repeatedly changing the Mac scan code.
+- **Firmware work:** the upstream project supports several different Nordic
+  MCUs, while converted ZKC42V tags may instead run a third-party Goodix port.
+  Do not flash a generic image until the exact MCU, board pin map, display
+  driver, firmware family, and a recovery/programming path are known. A wrong
+  target can make the display unbootable, and BLE OTA cannot help while the
+  GATT connection itself is unavailable.
 - **Snow/noise:** verify the driver ID and plane protocol; do not send a frame
   intended for another panel type.
 - **Mirrored/upside-down image:** use the checked-in orientation logic; changing
   byte order or adding a second flip will break the tested physical orientation.
 - **Stale date:** the board has no autonomous clock for this bitmap. Keep Codex
   Monitor running so the cross-day/hourly policy can send a new frame.
-

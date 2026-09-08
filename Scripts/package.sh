@@ -3,9 +3,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex Monitor"
-VERSION="${VERSION:-1.4.1}"
-BUILD_NUMBER="${BUILD_NUMBER:-30}"
+VERSION="${VERSION:-1.4.4}"
+BUILD_NUMBER="${BUILD_NUMBER:-40}"
+APP_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER:-com.example.codexmonitor}"
 APP_GROUP_IDENTIFIER="${APP_GROUP_IDENTIFIER:-group.com.example.codexmonitor}"
+WIDGET_BUNDLE_IDENTIFIER="${WIDGET_BUNDLE_IDENTIFIER:-com.example.codexmonitor.widget}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 DERIVED_DATA="$ROOT/.build/xcode"
 APP_SOURCE="$DERIVED_DATA/Build/Products/Release/$APP_NAME.app"
@@ -27,10 +29,11 @@ fi
 
 "$ROOT/Scripts/generate-project.sh"
 
-rm -rf "$DERIVED_DATA" "$APP_DIR"
+rm -rf "$APP_DIR"
 mkdir -p "$ROOT/dist"
 
 xcodebuild \
+  -quiet \
   -project "$ROOT/CodexUsageBar.xcodeproj" \
   -scheme CodexUsageBar \
   -configuration Release \
@@ -39,12 +42,24 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+  APP_BUNDLE_IDENTIFIER="$APP_BUNDLE_IDENTIFIER" \
   APP_GROUP_IDENTIFIER="$APP_GROUP_IDENTIFIER" \
-  ARCHS="arm64 x86_64" \
+  WIDGET_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_IDENTIFIER" \
+  ARCHS="${BUILD_ARCHS:-arm64 x86_64}" \
   ONLY_ACTIVE_ARCH=NO \
   build
 
 ditto "$APP_SOURCE" "$APP_DIR"
+
+# Optional local artwork is not part of the public source distribution.
+if [[ -f "$ROOT/Resources/OfficialCodexMenuTemplate.png" ]]; then
+  cp "$ROOT/Resources/OfficialCodexMenuTemplate.png" "$APP_DIR/Contents/Resources/"
+fi
+
+# Local development builds can inherit provenance/quarantine metadata while
+# being copied between build and install locations. That metadata makes
+# LaunchServices re-evaluate an otherwise valid stable signature after reboot.
+xattr -cr "$APP_DIR"
 
 if [[ ! -d "$WIDGET_DIR" ]]; then
   printf 'Missing embedded WidgetKit extension: %s\n' "$WIDGET_DIR" >&2
@@ -101,4 +116,8 @@ codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 
 printf 'Packaged: %s\n' "$APP_DIR"
 printf 'Version: %s (%s)\n' "$VERSION" "$BUILD_NUMBER"
-printf 'App Group: %s\n' "$APP_GROUP_IDENTIFIER"
+if [[ "${SHOW_BUNDLE_IDENTIFIERS:-0}" == "1" ]]; then
+  printf 'App bundle: %s\n' "$APP_BUNDLE_IDENTIFIER"
+  printf 'Widget bundle: %s\n' "$WIDGET_BUNDLE_IDENTIFIER"
+  printf 'App Group: %s\n' "$APP_GROUP_IDENTIFIER"
+fi

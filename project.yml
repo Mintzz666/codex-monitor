@@ -8,12 +8,14 @@ options:
 
 settings:
   base:
+    APP_BUNDLE_IDENTIFIER: com.example.codexmonitor
     APP_GROUP_IDENTIFIER: group.com.example.codexmonitor
-    CURRENT_PROJECT_VERSION: 30
+    CURRENT_PROJECT_VERSION: 40
     DEVELOPMENT_LANGUAGE: zh_CN
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: 1.4.1
+    MARKETING_VERSION: 1.4.4
     SWIFT_VERSION: 5.0
+    WIDGET_BUNDLE_IDENTIFIER: com.example.codexmonitor.widget
 
 targets:
   CodexUsageCore:
@@ -53,7 +55,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER)
         PRODUCT_NAME: Codex Monitor
     dependencies:
       - target: CodexUsageCore
@@ -72,7 +74,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Resources/WidgetInfo.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.codexmonitor.widget
+        PRODUCT_BUNDLE_IDENTIFIER: $(WIDGET_BUNDLE_IDENTIFIER)
         PRODUCT_NAME: CodexMonitorWidget
         SKIP_INSTALL: YES
     dependencies:

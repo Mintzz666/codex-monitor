@@ -59,11 +59,61 @@ public struct EPDDeviceDescriptor: Equatable, Sendable, Identifiable {
   public let id: String
   public let name: String
   public let signalStrength: Int?
+  public let isConnectable: Bool?
 
-  public init(id: String, name: String, signalStrength: Int? = nil) {
+  public init(
+    id: String,
+    name: String,
+    signalStrength: Int? = nil,
+    isConnectable: Bool? = nil
+  ) {
     self.id = id
     self.name = name
     self.signalStrength = signalStrength
+    self.isConnectable = isConnectable
+  }
+}
+
+/// Pure discovery rules shared by the CoreBluetooth adapter and verifier.
+/// Some NRF_EPD firmware revisions advertise only their service UUID, while
+/// others expose a local name with inconsistent separators.
+public enum NRFEPDDiscoveryPolicy {
+  public static func nameLooksCompatible(_ name: String?) -> Bool {
+    guard let name else { return false }
+    let compact = name.uppercased().filter { $0.isLetter || $0.isNumber }
+    return compact.contains("NRFEPD") || compact.hasPrefix("EPD")
+  }
+
+  public static func shouldAccept(
+    name: String?,
+    advertisesService: Bool
+  ) -> Bool {
+    advertisesService || nameLooksCompatible(name)
+  }
+
+  public static func isPreferred8042(_ name: String) -> Bool {
+    let compact = name.uppercased().filter { $0.isLetter || $0.isNumber }
+    return compact.contains("8042")
+  }
+
+  public static func validSignalStrength(_ rawValue: Int) -> Int? {
+    rawValue == 127 ? nil : rawValue
+  }
+
+  public static func clearlyStrongest(
+    in devices: [EPDDeviceDescriptor],
+    minimumAdvantage: Int = 10
+  ) -> EPDDeviceDescriptor? {
+    guard devices.count > 1 else { return devices.first }
+    let ranked = devices.compactMap { device -> (EPDDeviceDescriptor, Int)? in
+      guard let signalStrength = device.signalStrength else { return nil }
+      return (device, signalStrength)
+    }.sorted { $0.1 > $1.1 }
+    guard ranked.count == devices.count,
+      let first = ranked.first,
+      first.1 - ranked[1].1 >= minimumAdvantage
+    else { return nil }
+    return first.0
   }
 }
 

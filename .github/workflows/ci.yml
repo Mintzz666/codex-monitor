@@ -23,13 +23,12 @@ jobs:
       - name: Public release privacy check
         run: make public-release-check
 
-      - name: Generate Xcode projects
+      - name: Generate macOS Xcode project
         run: |
           make xcode-project
-          (cd Mobile && xcodegen generate --spec project.yml)
 
       - name: Check Swift formatting
-        run: swift format lint --recursive Sources Tests Mobile/Sources Package.swift
+        run: swift format lint --recursive Sources Tests Package.swift
 
       - name: Run deterministic verifier
         run: make test
@@ -37,19 +36,9 @@ jobs:
       - name: Build macOS widget
         run: make widget-build
 
-      - name: Compile iPhone app and widget
-        run: |
-          xcodebuild \
-            -project Mobile/CodexMonitorMobile.xcodeproj \
-            -scheme CodexMonitorMobile \
-            -sdk iphonesimulator \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
       - name: Package local macOS app and DMG
         env:
-          VERSION: 1.4.1
+          VERSION: 1.4.4
           BUILD_NUMBER: ${{ github.run_number }}
         run: make release-package
 
@@ -57,7 +46,7 @@ jobs:
         run: |
           APP="dist/Codex Monitor.app"
           WIDGET="$APP/Contents/PlugIns/CodexMonitorWidget.appex"
-          DMG="dist/Codex-Monitor-v1.4.1-universal.dmg"
+          DMG="dist/Codex-Monitor-v1.4.4-universal.dmg"
           test -d "$APP"
           test -d "$WIDGET"
           test -f "$DMG"

@@ -3,6 +3,7 @@
 .env.*
 /.build
 /dist
+/tmp
 /Packages
 .venv*
 xcuserdata/

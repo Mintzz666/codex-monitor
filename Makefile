@@ -1,4 +1,4 @@
-.PHONY: build test integration-test widget-build xcode-project package dmg release-package public-release-check run docs-screenshot clean
+.PHONY: build test integration-test widget-build xcode-project package dmg release-package public-release-check install run docs-screenshot clean
 
 build:
 	swift build
@@ -26,6 +26,9 @@ release-package:
 
 public-release-check:
 	./Scripts/public_release_check.py
+
+install:
+	./Scripts/install.sh
 
 run: package
 	open "dist/Codex Monitor.app"
