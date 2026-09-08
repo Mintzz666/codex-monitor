@@ -74,7 +74,7 @@ or spacing for the real panel.
 
 - `docs/release-notes/v1.1.0.md`
 - `docs/release-notes/v1.2.0.md`
-- `Mobile/README.md`
+- Mobile documentation was retired in 1.4.4; see Git history for the iPhone version.
 
 This checkpoint intentionally leaves the working tree intact. No `git stash`,
 reset, or history-rewriting operation has been performed.

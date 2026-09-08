@@ -237,6 +237,7 @@ final class UsageViewModel: ObservableObject {
       } else {
         try SMAppService.mainApp.unregister()
       }
+      languageDefaults.set(true, forKey: Self.launchAtLoginConfiguredKey)
     } catch {
       launchAtLoginErrorDetails = error.localizedDescription
     }
@@ -329,7 +330,9 @@ final class UsageViewModel: ObservableObject {
           finalError = error
           await epdTransport?.disconnect()
           if attempt == 0 {
-            try? await Task.sleep(nanoseconds: 500_000_000)
+            // Let bluetoothd fully settle its filter list and pending
+            // controller retry before beginning the second fresh scan.
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
           }
         }
       }
@@ -439,45 +442,51 @@ final class UsageViewModel: ObservableObject {
   }
 
   private func receiveEPDInformation(_ information: NRFEPDDeviceInformation) {
-    epdInformation = information
+    // Version and control characteristics arrive independently. A connection
+    // can therefore report the firmware before the display driver response is
+    // available. Preserve hardware fields learned by an earlier successful
+    // handshake instead of treating a partial update as an instruction to
+    // erase them.
+    let previous = epdInformation
+    let mergedInformation = NRFEPDDeviceInformation(
+      device: information.device,
+      firmwareVersion:
+        information.firmwareVersion ?? previous?.firmwareVersion,
+      driverID: information.driverID ?? previous?.driverID,
+      pinConfiguration:
+        information.pinConfiguration ?? previous?.pinConfiguration,
+      reportedMTU: information.reportedMTU ?? previous?.reportedMTU,
+      supportsRLE: information.supportsRLE || (previous?.supportsRLE ?? false)
+    )
+    epdInformation = mergedInformation
     languageDefaults.set(
-      information.device.id,
+      mergedInformation.device.id,
       forKey: Self.epdDeviceIDStorageKey
     )
     languageDefaults.set(
-      information.device.name,
+      mergedInformation.device.name,
       forKey: Self.epdDeviceNameStorageKey
     )
-    if let firmwareVersion = information.firmwareVersion {
+    if let firmwareVersion = mergedInformation.firmwareVersion {
       languageDefaults.set(
         Int(firmwareVersion),
         forKey: Self.epdFirmwareStorageKey
       )
-    } else {
-      languageDefaults.removeObject(forKey: Self.epdFirmwareStorageKey)
     }
-    if let driverID = information.driverID {
+    if let driverID = mergedInformation.driverID {
       languageDefaults.set(Int(driverID), forKey: Self.epdDriverStorageKey)
-    } else {
-      languageDefaults.removeObject(forKey: Self.epdDriverStorageKey)
     }
-    if let pinConfiguration = information.pinConfiguration {
+    if let pinConfiguration = mergedInformation.pinConfiguration {
       languageDefaults.set(
         pinConfiguration,
         forKey: Self.epdPinConfigurationStorageKey
       )
-    } else {
-      languageDefaults.removeObject(
-        forKey: Self.epdPinConfigurationStorageKey
-      )
     }
-    if let reportedMTU = information.reportedMTU {
+    if let reportedMTU = mergedInformation.reportedMTU {
       languageDefaults.set(reportedMTU, forKey: Self.epdMTUStorageKey)
-    } else {
-      languageDefaults.removeObject(forKey: Self.epdMTUStorageKey)
     }
     languageDefaults.set(
-      information.supportsRLE,
+      mergedInformation.supportsRLE,
       forKey: Self.epdRLEStorageKey
     )
   }
@@ -762,18 +771,27 @@ final class UsageViewModel: ObservableObject {
   private static let epdLastFrameFingerprintStorageKey =
     "epd-last-frame-fingerprint-v1"
 
-  private func refreshLaunchAtLoginStatus() {
+  private static let launchAtLoginConfiguredKey = "launch-at-login-configured-v1"
+
+  func refreshLaunchAtLoginStatus() {
     launchAtLoginEnabled = SMAppService.mainApp.status == .enabled
   }
 
   private func ensureLaunchAtLoginEnabled() {
     refreshLaunchAtLoginStatus()
-    guard !launchAtLoginEnabled else {
+    guard !languageDefaults.bool(forKey: Self.launchAtLoginConfiguredKey) else {
+      return
+    }
+    // Register by default once. Later launches respect both the in-app toggle
+    // and changes made in System Settings.
+    if SMAppService.mainApp.status != .notRegistered {
+      languageDefaults.set(true, forKey: Self.launchAtLoginConfiguredKey)
       return
     }
 
     do {
       try SMAppService.mainApp.register()
+      languageDefaults.set(true, forKey: Self.launchAtLoginConfiguredKey)
       launchAtLoginErrorDetails = nil
     } catch {
       launchAtLoginErrorDetails = error.localizedDescription

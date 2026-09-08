@@ -33,7 +33,6 @@ Codex Monitor is designed to:
 - avoid browser cookies
 - avoid persisting access tokens
 - treat app-server responses as untrusted input
-- keep iPhone OAuth credentials in a ThisDeviceOnly Keychain group
 - send only rendered pixels, never account data, to the BLE display
 
 Changes that weaken these boundaries require explicit security review.

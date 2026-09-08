@@ -1,5 +1,6 @@
 import AppKit
 import CodexUsageShared
+import Combine
 import Darwin
 import SwiftUI
 
@@ -18,6 +19,7 @@ struct CodexUsageBarApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private let viewModel = UsageViewModel()
   private var statusBarController: StatusBarController?
+  private var wakeObserver: AnyCancellable?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApplication.shared.setActivationPolicy(.accessory)
@@ -38,6 +40,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     statusBarController = StatusBarController(viewModel: viewModel)
+    wakeObserver = NSWorkspace.shared.notificationCenter
+      .publisher(for: NSWorkspace.didWakeNotification)
+      .receive(on: RunLoop.main)
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in
+          await self?.viewModel.refreshIfStale()
+        }
+      }
     Task {
       await viewModel.activate()
     }

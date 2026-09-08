@@ -377,6 +377,17 @@ struct UsageMenuView: View {
 
         Spacer()
 
+        Button {
+          Task { await viewModel.refresh() }
+        } label: {
+          Label(
+            language == .simplifiedChinese ? "刷新" : "Refresh",
+            systemImage: "arrow.clockwise"
+          )
+        }
+        .keyboardShortcut("r")
+        .disabled(viewModel.isRefreshing)
+
         Button(language.text(.quit)) {
           NSApplication.shared.terminate(nil)
         }

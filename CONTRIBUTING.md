@@ -15,7 +15,7 @@ Thanks for helping improve Codex Monitor.
 - macOS 13 or later
 - Swift 6.3 toolchain
 - A local Codex installation for optional integration checks
-- Xcode with the iOS 17 SDK for mobile changes
+- Full Xcode for the macOS app and WidgetKit extension
 
 ## Local workflow
 
@@ -37,8 +37,8 @@ make integration-test
 Format Swift sources before committing:
 
 ```bash
-swift format --in-place --recursive Sources Tests Mobile/Sources Package.swift
-swift format lint --recursive Sources Tests Mobile/Sources Package.swift
+swift format --in-place --recursive Sources Tests Package.swift
+swift format lint --recursive Sources Tests Package.swift
 ```
 
 ## Pull requests
@@ -66,7 +66,6 @@ If a Codex response shape changes:
 - add a deterministic verifier fixture
 - run the live integration check when possible
 
-For iPhone changes, never commit device-authorization codes, OAuth responses,
-Keychain exports, provisioning profiles, Apple Team IDs, or personal bundle
+Never commit provisioning profiles, Apple Team IDs, or personal bundle
 identifiers. For EPD changes, include a deterministic plane/orientation check
 and state the exact hardware model used for physical verification.

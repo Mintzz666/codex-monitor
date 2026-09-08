@@ -92,7 +92,11 @@ public final class NRFEPDBluetoothTransport: NSObject, EPDTransport {
   private static let targetedScanNanoseconds: UInt64 = 8_000_000_000
   private static let fallbackScanNanoseconds: UInt64 = 10_000_000_000
   private static let scanPollNanoseconds: UInt64 = 100_000_000
-  private static let connectionTimeoutNanoseconds: UInt64 = 18_000_000_000
+  // macOS may establish the radio link and retry the link-ready/GATT phase
+  // several times for this converted ESL firmware. Keep one CoreBluetooth
+  // request alive long enough for those controller-level retries instead of
+  // cancelling and starting over after the first failed handshake.
+  private static let connectionTimeoutNanoseconds: UInt64 = 60_000_000_000
   private static let serviceUUID = CBUUID(
     string: NRFEPDProtocol.serviceUUID
   )

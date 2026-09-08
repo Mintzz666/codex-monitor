@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex Monitor"
-VERSION="${VERSION:-1.4.2}"
-BUILD_NUMBER="${BUILD_NUMBER:-38}"
+VERSION="${VERSION:-1.4.4}"
+BUILD_NUMBER="${BUILD_NUMBER:-40}"
 APP_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER:-com.example.codexmonitor}"
 APP_GROUP_IDENTIFIER="${APP_GROUP_IDENTIFIER:-group.com.example.codexmonitor}"
 WIDGET_BUNDLE_IDENTIFIER="${WIDGET_BUNDLE_IDENTIFIER:-com.example.codexmonitor.widget}"
@@ -29,7 +29,7 @@ fi
 
 "$ROOT/Scripts/generate-project.sh"
 
-rm -rf "$DERIVED_DATA" "$APP_DIR"
+rm -rf "$APP_DIR"
 mkdir -p "$ROOT/dist"
 
 xcodebuild \
@@ -45,11 +45,16 @@ xcodebuild \
   APP_BUNDLE_IDENTIFIER="$APP_BUNDLE_IDENTIFIER" \
   APP_GROUP_IDENTIFIER="$APP_GROUP_IDENTIFIER" \
   WIDGET_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_IDENTIFIER" \
-  ARCHS="arm64 x86_64" \
+  ARCHS="${BUILD_ARCHS:-arm64 x86_64}" \
   ONLY_ACTIVE_ARCH=NO \
   build
 
 ditto "$APP_SOURCE" "$APP_DIR"
+
+# Optional local artwork is not part of the public source distribution.
+if [[ -f "$ROOT/Resources/OfficialCodexMenuTemplate.png" ]]; then
+  cp "$ROOT/Resources/OfficialCodexMenuTemplate.png" "$APP_DIR/Contents/Resources/"
+fi
 
 # Local development builds can inherit provenance/quarantine metadata while
 # being copied between build and install locations. That metadata makes

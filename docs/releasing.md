@@ -1,7 +1,7 @@
 # Public release process
 
-This repository publishes source plus a universal macOS DMG. The iPhone target
-is distributed as source because Apple signing belongs to each installer.
+This repository publishes the macOS app, desktop widgets, and Bluetooth EPD
+support as source plus a universal macOS DMG. Mobile targets have been retired.
 
 ## 1. Update versions
 
@@ -34,14 +34,14 @@ Team IDs, provisioning profiles, or personal email addresses.
 ## 3. Build artifacts
 
 ```sh
-VERSION=1.4.2 BUILD_NUMBER=38 make release-package
+VERSION=1.4.4 BUILD_NUMBER=40 make release-package
 ```
 
 This creates:
 
 - `dist/Codex Monitor.app`
-- `dist/Codex-Monitor-v1.4.2-universal.dmg`
-- `dist/Codex-Monitor-v1.4.2-universal.dmg.sha256`
+- `dist/Codex-Monitor-v1.4.4-universal.dmg`
+- `dist/Codex-Monitor-v1.4.4-universal.dmg.sha256`
 
 Without signing environment variables, the output is ad-hoc signed. Optional
 notarization runs only when `APPLE_NOTARY_KEY_BASE64` and the related notary
@@ -52,7 +52,7 @@ Verify the checksum:
 
 ```sh
 cd dist
-shasum -a 256 -c Codex-Monitor-v1.4.2-universal.dmg.sha256
+shasum -a 256 -c Codex-Monitor-v1.4.4-universal.dmg.sha256
 ```
 
 ## 4. Tag and GitHub Release
@@ -62,11 +62,11 @@ release check and deterministic verifier, builds the DMG, and uploads the DMG
 and checksum to a GitHub Release.
 
 ```sh
-git tag -a v1.4.2 -m "Codex Monitor 1.4.2"
-git push origin v1.4.2
+git tag -a v1.4.4 -m "Codex Monitor 1.4.4"
+git push origin v1.4.4
 ```
 
-For a manual release, use the text in `docs/release-notes/v1.4.2.md` and upload
+For a manual release, use the text in `docs/release-notes/v1.4.4.md` and upload
 only the current DMG and its matching checksum.
 
 ## 5. Post-release verification
@@ -76,4 +76,4 @@ only the current DMG and its matching checksum.
 - Download the release assets and verify SHA-256.
 - Confirm the source archive contains no ignored build or credential files.
 - Confirm the DMG reports the intended version and contains the widget.
-- Confirm the release states that the iPhone app requires local Apple signing.
+- Confirm the release contains only the macOS app and desktop widget extension.

@@ -87,6 +87,13 @@ then Run. The built product is `Codex Monitor.app`.
 
 ## 5. Install and widgets / 安装与小组件
 
+For a local update, run `make install`. It preserves the identifiers of the app
+already in `/Applications`, saves a rollback copy under `dist/backups/`, then
+replaces and opens the application. No device preferences are removed.
+Use `BUILD_ARCHS="$(uname -m)" make install` for a faster build for this Mac only.
+Full Xcode is still required; the iPhone targets have been removed.
+
+
 1. Move `Codex Monitor.app` to `/Applications` and launch it once.
 2. Wait for a successful usage refresh.
 3. Open Notification Center, choose **Edit Widgets**, search for
@@ -94,7 +101,9 @@ then Run. The built product is `Codex Monitor.app`.
 4. The application registers launch at login by default. It can be disabled in
    the menu panel.
 
-The menu refreshes once per minute. WidgetKit controls widget scheduling; the
+The menu refreshes once per minute, checks stale data after wake, and supports
+manual refresh with Command-R. The panel scrolls to fit the display.
+Turning off launch at login is remembered after restarting the app. WidgetKit controls widget scheduling; the
 app publishes only a sanitized quota snapshot.
 
 ## 6. Common failures / 常见问题
