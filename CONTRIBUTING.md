@@ -2,6 +2,8 @@
 
 Thanks for helping improve Codex Monitor.
 
+Current review: [1.4.9 maintenance findings and size opportunities](docs/maintenance-review-2026-11-02.md).
+
 ## Before you start
 
 - Search existing issues before opening a new one.
@@ -55,9 +57,10 @@ All pull requests must pass the macOS CI workflow.
 
 ## Protocol changes
 
-The app intentionally communicates through the local Codex app-server instead
-of reading authentication material. Preserve that boundary when adding
-features.
+The app obtains usage through the local Codex app-server. The account-change
+guard reads the local authentication file to derive an account fingerprint;
+it does not use access or refresh token values. Preserve the identity-check
+boundary described in [architecture and privacy](docs/architecture-and-privacy.md).
 
 If a Codex response shape changes:
 

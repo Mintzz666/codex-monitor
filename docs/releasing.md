@@ -42,8 +42,8 @@ VERSION=1.4.9 BUILD_NUMBER=46 make release-package
 This creates:
 
 - `dist/Codex Monitor.app`
-- `dist/Codex-Monitor-v1.4.6-universal.dmg`
-- `dist/Codex-Monitor-v1.4.6-universal.dmg.sha256`
+- `dist/Codex-Monitor-v1.4.9-universal.dmg`
+- `dist/Codex-Monitor-v1.4.9-universal.dmg.sha256`
 
 Without signing environment variables, the output is ad-hoc signed. Optional
 notarization runs only when `APPLE_NOTARY_KEY_BASE64` and the related notary
@@ -54,7 +54,7 @@ Verify the checksum:
 
 ```sh
 cd dist
-shasum -a 256 -c Codex-Monitor-v1.4.6-universal.dmg.sha256
+shasum -a 256 -c Codex-Monitor-v1.4.9-universal.dmg.sha256
 ```
 
 ## 4. Tag and GitHub Release
@@ -64,11 +64,11 @@ release check and deterministic verifier, builds the DMG, and uploads the DMG
 and checksum to a GitHub Release.
 
 ```sh
-git tag -a v1.4.6 -m "Codex Monitor 1.4.6"
-git push origin v1.4.6
+git tag -a v1.4.9 -m "Codex Monitor 1.4.9"
+git push origin v1.4.9
 ```
 
-For a manual release, use the text in `docs/release-notes/v1.4.6.md` and upload
+For a manual release, use the text in `docs/release-notes/v1.4.9.md` and upload
 only the current DMG and its matching checksum.
 
 ## 5. Post-release verification

@@ -11,8 +11,8 @@
 `codex app-server` 和 ChatGPT 桌面端注入能力；不得把 macOS API 或 Badge
 上游的 Windows 代码直接当作已验证的 Monitor 实现。
 
-当前公开基线：仓库 `Mintzz666/codex-monitor`，标签 `v1.4.9`，
-主提交 `4ec031d5ccd485e3dd571feb36eef4a0adeaee5e`。
+移植起点：仓库 `Mintzz666/codex-monitor` 的 `v1.4.9` 标签，
+对应提交 `4ec031d5ccd485e3dd571feb36eef4a0adeaee5e`；这不是对当前 `main` 的固定声明。
 使用独立 worktree/分支开发，不改写 macOS 发布标签，不把账号数据带入
 测试样例或提交。
 

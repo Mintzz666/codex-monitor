@@ -75,8 +75,7 @@ history available.
 
 ## Public-release privacy controls
 
-The public repository is assembled without the original Git history so personal
-commit email addresses are not republished. It excludes build directories,
+The published source tree excludes build directories,
 DMG history, local Xcode user data, provisioning profiles, Keychain exports,
 environment files, and workspace paths. Bundle and App Group identifiers use
 `com.example` placeholders.
