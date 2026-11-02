@@ -1,10 +1,14 @@
-.PHONY: build test integration-test widget-build xcode-project package dmg release-package public-release-check install run docs-screenshot clean
+.PHONY: build test badge-test integration-test widget-build xcode-project package dmg release-package public-release-check install run docs-screenshot clean
 
 build:
 	swift build
 
 test:
 	swift run CodexUsageVerifier
+
+badge-test:
+	$${CODEX_BADGE_NODE:-node} --test Tests/codex_usage_badge_health.test.cjs
+	python3 -m unittest discover -s Tests -p 'test_badge_packaging.py'
 
 integration-test:
 	swift run CodexUsageVerifier --integration

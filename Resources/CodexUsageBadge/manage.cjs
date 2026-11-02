@@ -20,19 +20,7 @@ const startupDir=path.join(installDir,'startup-helper');
 const packagedBridge=path.join(__dirname,'macos/startup/bridge');
 const bridgeSource=fs.existsSync(packagedBridge)?packagedBridge:path.join(__dirname,'.devtools/macos-startup-bridge');
 const runtimeFiles={'agent.cjs':path.join(__dirname,'agent.cjs'),'manage.cjs':path.join(__dirname,'manage.cjs'),'macos/shortcuts.cjs':path.join(__dirname,'macos/shortcuts.cjs'),'startup-helper/bridge':bridgeSource,'startup-helper/controller.cjs':path.join(__dirname,'macos/startup/controller.cjs'),'startup-helper/watch.cjs':path.join(__dirname,'macos/startup/watch.cjs')};
-function addTreeFiles(sourceDirectory, installDirectory) {
-  if (!fs.existsSync(sourceDirectory)) return;
-  for (const entry of fs.readdirSync(sourceDirectory, { withFileTypes: true })) {
-    const source = path.join(sourceDirectory, entry.name);
-    const relative = path.join(installDirectory, entry.name);
-    if (entry.isDirectory()) addTreeFiles(source, relative);
-    else if (entry.isFile()) runtimeFiles[relative] = source;
-  }
-}
-addTreeFiles(
-  path.join(__dirname, 'local-customization/project-thread-color'),
-  'local-customization/project-thread-color'
-);
+// Development history and rollback scripts remain in the source repository.
 const networkAdapter = path.join(__dirname, 'network-agent.cjs');
 if (fs.existsSync(networkAdapter)) runtimeFiles['network-agent.cjs'] = networkAdapter;
 const sharedQuotaReader = path.join(__dirname, 'shared-quota.cjs');
@@ -165,7 +153,7 @@ async function install() {
   }
   try {await cleanupLegacyLauncher({home,app,installDir,bridge:path.join(startupDir,'bridge'),command,ownedLauncher,ownedShortcut});}
   catch(error){console.warn('自动加载已安装；旧快捷方式需手动移除：'+error.message);}
-  console.log('已安装 v0.9.1，后台服务已启动。若 ChatGPT 主窗口未连接，请手动完全退出后运行「启动ChatGPT并加载外观.command」。');
+  console.log('已安装 v0.9.1，后台服务已启动。若 ChatGPT 主窗口未连接，请手动完全退出，再从原来的图标重新打开。');
 }
 async function targets() {
   const response=await fetch('http://127.0.0.1:39222/json/list',{signal:AbortSignal.timeout(2000)});

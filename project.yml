@@ -10,10 +10,10 @@ settings:
   base:
     APP_BUNDLE_IDENTIFIER: com.example.codexmonitor
     APP_GROUP_IDENTIFIER: group.com.example.codexmonitor
-    CURRENT_PROJECT_VERSION: 46
+    CURRENT_PROJECT_VERSION: 47
     DEVELOPMENT_LANGUAGE: zh_CN
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: 1.4.9
+    MARKETING_VERSION: 1.4.10
     SWIFT_VERSION: 5.0
     WIDGET_BUNDLE_IDENTIFIER: com.example.codexmonitor.widget
 
@@ -44,8 +44,6 @@ targets:
     sources:
       - Sources/CodexUsageBar
       - path: Resources/AppIcon.icns
-        buildPhase: resources
-      - path: Resources/AppIcon/AppIcon-1024.png
         buildPhase: resources
     settings:
       base:

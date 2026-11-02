@@ -17,6 +17,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Read package version
+        run: echo "VERSION=$(awk '/MARKETING_VERSION:/{print $2; exit}' project.yml)" >> "$GITHUB_ENV"
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -33,12 +40,14 @@ jobs:
       - name: Run deterministic verifier
         run: make test
 
+      - name: Verify Badge and release file selection
+        run: make badge-test
+
       - name: Build macOS widget
         run: make widget-build
 
       - name: Package local macOS app and DMG
         env:
-          VERSION: 1.4.4
           BUILD_NUMBER: ${{ github.run_number }}
         run: make release-package
 
@@ -46,7 +55,7 @@ jobs:
         run: |
           APP="dist/Codex Monitor.app"
           WIDGET="$APP/Contents/PlugIns/CodexMonitorWidget.appex"
-          DMG="dist/Codex-Monitor-v1.4.4-universal.dmg"
+          DMG="dist/Codex-Monitor-v${VERSION}-universal.dmg"
           test -d "$APP"
           test -d "$WIDGET"
           test -f "$DMG"

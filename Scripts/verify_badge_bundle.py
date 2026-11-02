@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 from pathlib import Path
 import sys
 
@@ -23,11 +24,19 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def all_files() -> dict[str, str]:
+RUNTIME_FILES = [
+    "agent.cjs", "manage.cjs", "network-agent.cjs", "shared-quota.cjs",
+    "macos/shortcuts.cjs", "macos/startup/bridge",
+    "macos/startup/controller.cjs", "macos/startup/watch.cjs",
+]
+PACKAGE_FILES = [*RUNTIME_FILES, "health.cjs", "network-health.cjs", "LICENSE", "NOTICE.md"]
+
+
+def all_files(directory: Path = BUNDLE) -> dict[str, str]:
     return {
-        path.relative_to(BUNDLE).as_posix(): sha256(path)
-        for path in sorted(BUNDLE.rglob("*"))
-        if path.is_file() and path != MANIFEST
+        path.relative_to(directory).as_posix(): sha256(path)
+        for path in sorted(directory.rglob("*"))
+        if path.is_file() and path != directory / "manifest.json"
     }
 
 
@@ -39,18 +48,8 @@ def make_manifest(files: dict[str, str]) -> dict[str, object]:
     if files.get("agent.cjs") != PINNED_SHA256:
         raise ValueError("The bundled agent.cjs does not match the pinned optimized build.")
 
-    runtime_files = [
-        "agent.cjs",
-        "manage.cjs",
-        "network-agent.cjs",
-        "shared-quota.cjs",
-        "macos/shortcuts.cjs",
-        "macos/startup/bridge",
-        "macos/startup/controller.cjs",
-        "macos/startup/watch.cjs",
-        *sorted(name for name in files if name.startswith("local-customization/project-thread-color/")),
-    ]
-    missing = [name for name in runtime_files if name not in files]
+    runtime_files = RUNTIME_FILES
+    missing = [name for name in PACKAGE_FILES if name not in files]
     if missing:
         raise ValueError("Required runtime files are missing: " + ", ".join(missing))
     return {
@@ -66,10 +65,43 @@ def make_manifest(files: dict[str, str]) -> dict[str, object]:
     }
 
 
+def packaged_manifest(source_manifest: dict[str, object]) -> dict[str, object]:
+    return {
+        **source_manifest,
+        "files": {name: source_manifest["files"][name] for name in sorted(PACKAGE_FILES)},
+    }
+
+
+def verify_package(directory: Path, expected: dict[str, object]) -> None:
+    current = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    if current != expected or all_files(directory) != expected["files"]:
+        raise ValueError("Packaged Badge files or manifest do not match the release allowlist.")
+
+
+def stage_package(destination: Path, expected: dict[str, object]) -> None:
+    # A fresh directory prevents stale development files leaking into releases.
+    destination.mkdir(parents=True, exist_ok=False)
+    for name in PACKAGE_FILES:
+        source = BUNDLE / name
+        if source.is_symlink():
+            raise ValueError(f"Refusing to package a symbolic link: {name}")
+        target = destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    (destination / "manifest.json").write_text(
+        json.dumps(expected, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    verify_package(destination, expected)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true", help="Regenerate the resource manifest after an intentional update.")
+    parser.add_argument("--stage", type=Path, help="Stage runtime-only resources into a new directory.")
+    parser.add_argument("--verify-package", type=Path, help="Verify staged runtime resources against source.")
     args = parser.parse_args()
+    if args.write and (args.stage or args.verify_package):
+        parser.error("--write cannot be combined with staging or package verification")
 
     try:
         files = all_files()
@@ -82,6 +114,13 @@ def main() -> int:
         if current != expected:
             print("Badge resource manifest is stale or files have changed; review changes before packaging.", file=sys.stderr)
             return 1
+        release_manifest = packaged_manifest(expected)
+        if args.stage:
+            stage_package(args.stage, release_manifest)
+            print(f"Staged {len(PACKAGE_FILES)} release files; development history stays in source.")
+        if args.verify_package:
+            verify_package(args.verify_package, release_manifest)
+            print("Packaged Badge allowlist and hashes verified.")
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"Badge resource verification failed: {error}", file=sys.stderr)
         return 1

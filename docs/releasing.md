@@ -21,6 +21,7 @@ Regenerate the project with XcodeGen when available.
 ```sh
 make public-release-check
 make test
+make badge-test
 make integration-test
 ```
 
@@ -33,17 +34,18 @@ IDs, provisioning profiles, or personal email addresses.
 
 ## 3. Build artifacts
 
-The current release is version 1.4.9, Build 46.
+The prepared package version is 1.4.10, Build 47. The published 1.4.9 release
+remains unchanged until a new release is explicitly published.
 
 ```sh
-VERSION=1.4.9 BUILD_NUMBER=46 make release-package
+VERSION=1.4.10 BUILD_NUMBER=47 make release-package
 ```
 
 This creates:
 
 - `dist/Codex Monitor.app`
-- `dist/Codex-Monitor-v1.4.9-universal.dmg`
-- `dist/Codex-Monitor-v1.4.9-universal.dmg.sha256`
+- `dist/Codex-Monitor-v1.4.10-universal.dmg`
+- `dist/Codex-Monitor-v1.4.10-universal.dmg.sha256`
 
 Without signing environment variables, the output is ad-hoc signed. Optional
 notarization runs only when `APPLE_NOTARY_KEY_BASE64` and the related notary
@@ -54,7 +56,7 @@ Verify the checksum:
 
 ```sh
 cd dist
-shasum -a 256 -c Codex-Monitor-v1.4.9-universal.dmg.sha256
+shasum -a 256 -c Codex-Monitor-v1.4.10-universal.dmg.sha256
 ```
 
 ## 4. Tag and GitHub Release
@@ -64,11 +66,11 @@ release check and deterministic verifier, builds the DMG, and uploads the DMG
 and checksum to a GitHub Release.
 
 ```sh
-git tag -a v1.4.9 -m "Codex Monitor 1.4.9"
-git push origin v1.4.9
+git tag -a v1.4.10 -m "Codex Monitor 1.4.10"
+git push origin v1.4.10
 ```
 
-For a manual release, use the text in `docs/release-notes/v1.4.9.md` and upload
+For a manual release, use the text in `docs/release-notes/v1.4.10.md` and upload
 only the current DMG and its matching checksum.
 
 ## 5. Post-release verification

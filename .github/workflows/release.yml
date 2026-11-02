@@ -16,6 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -24,6 +28,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           make public-release-check
           make test
+          make badge-test
           make xcode-project
           VERSION="$VERSION" BUILD_NUMBER="${GITHUB_RUN_NUMBER}" make release-package
 

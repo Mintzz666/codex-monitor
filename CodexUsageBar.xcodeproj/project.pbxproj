@@ -12,7 +12,6 @@
 		1D455EC2C019C40DACA5FD1A /* CodexAppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B766DA68E8BCCD5AEB83F11 /* CodexAppServerClient.swift */; };
 		272F2E3A48F89C9FEA53F25E /* libCodexUsageCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B62E6AACDE388B3D9F68AC13 /* libCodexUsageCore.a */; };
 		378B8A41218266EAF060B76C /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = A06D789516C01E0E027B38FF /* AppIcon.icns */; };
-		39E39D0DDB7A4A2991387D71 /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = D96640C4A38D4B0082BE7D2A /* AppIcon-1024.png */; };
 		3EB9B8473461E84AC7D12573 /* LocalUsageSnapshotBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB3CD68EC00EFF650449EE33 /* LocalUsageSnapshotBridge.swift */; };
 		478AE62507861F4B424B3782 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5964387CC7B9C1338680606C /* UsageViewModel.swift */; };
 		6244F47599EF45B7B08749AD /* BadgeIntegrationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A514F1A3E6E44E3A13C6E9B /* BadgeIntegrationViewModel.swift */; };
@@ -98,7 +97,6 @@
 		C2A1C90E38989E05CBB134D0 /* SharedUsageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedUsageStore.swift; sourceTree = "<group>"; };
 		CAE7AC9F375D1BA2A45621B9 /* UsageSubscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageSubscription.swift; sourceTree = "<group>"; };
 		CB3CD68EC00EFF650449EE33 /* LocalUsageSnapshotBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalUsageSnapshotBridge.swift; sourceTree = "<group>"; };
-		D96640C4A38D4B0082BE7D2A /* AppIcon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIcon/AppIcon-1024.png; sourceTree = "<group>"; };
 		E9F0D22719518AF71134EA29 /* Codex Monitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Codex Monitor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F87E3021DF7F9A701E8FDA81 /* CodexUsageWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageWidget.swift; sourceTree = "<group>"; };
 		EB01D1C86563434AA70C5B1A /* ResetRadar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetRadar.swift; sourceTree = "<group>"; };
@@ -235,7 +233,6 @@
 			isa = PBXGroup;
 			children = (
 				A06D789516C01E0E027B38FF /* AppIcon.icns */,
-				D96640C4A38D4B0082BE7D2A /* AppIcon-1024.png */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -368,7 +365,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				378B8A41218266EAF060B76C /* AppIcon.icns in Resources */,
-				39E39D0DDB7A4A2991387D71 /* AppIcon-1024.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -543,7 +539,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_LANGUAGE = zh_CN;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -564,7 +560,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.9;
+				MARKETING_VERSION = 1.4.10;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -744,7 +740,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_LANGUAGE = zh_CN;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -759,7 +755,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.9;
+				MARKETING_VERSION = 1.4.10;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

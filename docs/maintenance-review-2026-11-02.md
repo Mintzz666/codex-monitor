@@ -1,9 +1,9 @@
 # Codex Monitor 1.4.9 maintenance review / 整合版审查
 
 Reviewed on 2026-11-02 against public main `8e09ae9`, release `v1.4.9`
-(Build 46). This review records findings and proposed changes; package slimming
-and local cache cleanup have **not** been performed. The GitHub presentation,
-attribution and documentation changes are separate from these proposals.
+(Build 46). This review first recorded proposed changes. After approval, runtime-only
+packaging was implemented and measured; see the implementation results below.
+Local cache cleanup has not been performed.
 
 本次以公开整合版为基线，检查构建入口、主要数据链路、内置助手、源码归属、
 安装包组成和现有测试。以下是定向审查，不是完整安全审计或长期性能基准。
@@ -82,3 +82,31 @@ attribution and documentation changes are separate from these proposals.
 The estimated 15.5% saving concerns uncompressed file sizes. A smaller DMG,
 lower RSS or lower energy use remains unverified until implementation and a
 matched before/after measurement. Existing public release assets are unchanged.
+
+## 获批后的实施与实测 / Approved implementation results
+
+2026-11-02：用户批准实施发布包瘦身并验证构建。已准备本地候选包
+**1.4.10 / Build 47**，没有替换公开 1.4.9 附件或本机安装。
+
+- PNG 留在源码和 README 中，从 Xcode 资源阶段移除；安装包仍使用 ICNS 图标。
+- Badge 发布包改为 12 个运行/诊断/许可文件加 manifest；源码保留完整 31 文件。
+  manifest 的运行清单和管理器安装清单同步缩小，旧开发资料不会再被递归安装。
+  用户已安装的回退资料不会被清除。
+- 发布清单按源文件哈希核验，拒绝缺失、篡改、意外混入的旧文件及覆盖已有暂存目录。
+- CI 从 project.yml 读取版本；新增 Node 24 和 Badge/打包回归检查。
+
+实测以下载的公开 1.4.9 DMG 和本地新 DMG **各自内部的双架构应用**比较：
+
+| 项目 | 1.4.9 / Build 46 | 1.4.10 / Build 47 | 减少 |
+|---|---:|---:|---:|
+| 应用文件逻辑长度 | 8,495,361 bytes | 7,165,892 bytes | **15.65%** |
+| 压缩 DMG | 4,588,711 bytes | 3,592,823 bytes | **21.7%** |
+
+验证：80 项 Swift 检查、7 项 Badge 测试、5 项打包回归检查通过；新 DMG 的
+SHA-256、版本、应用及 Widget 的 arm64/x86_64 架构、签名均通过。只读挂载
+新 DMG 后确认 PNG/开发资料未进入应用，LICENSE/NOTICE/ICNS 仍在；包内
+健康检查的资源哈希和安装器只读 preflight 通过。
+
+本轮没有调用安装或修复，也未测量长期能耗/内存。新的后台管理器尚未替换
+已安装版本，因此本轮结论覆盖构建、包内容及只读安装预检；不宣称已完成
+新版本安装后的真实服务切换或页面注入验收。

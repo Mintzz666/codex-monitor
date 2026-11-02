@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex Monitor"
-VERSION="${VERSION:-1.4.9}"
-BUILD_NUMBER="${BUILD_NUMBER:-46}"
+VERSION="${VERSION:-1.4.10}"
+BUILD_NUMBER="${BUILD_NUMBER:-47}"
 APP_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER:-com.example.codexmonitor}"
 APP_GROUP_IDENTIFIER="${APP_GROUP_IDENTIFIER:-group.com.example.codexmonitor}"
 WIDGET_BUNDLE_IDENTIFIER="${WIDGET_BUNDLE_IDENTIFIER:-com.example.codexmonitor.widget}"
@@ -74,7 +74,9 @@ xcodebuild \
 ditto "$APP_SOURCE" "$APP_DIR"
 
 mkdir -p "$APP_DIR/Contents/Resources"
-ditto "$BADGE_RESOURCES" "$APP_DIR/Contents/Resources/CodexUsageBadge"
+# Remove a stale PNG left by incremental Xcode builds; ICNS is the app icon.
+rm -f "$APP_DIR/Contents/Resources/AppIcon-1024.png"
+python3 "$ROOT/Scripts/verify_badge_bundle.py" --stage "$APP_DIR/Contents/Resources/CodexUsageBadge"
 ACTUAL_BADGE_SHA256="$(shasum -a 256 "$APP_DIR/Contents/Resources/CodexUsageBadge/agent.cjs" | awk '{print $1}')"
 if [[ "$ACTUAL_BADGE_SHA256" != "$PINNED_BADGE_SHA256" ]]; then
   printf 'Packaged Badge build hash mismatch: %s\n' "$ACTUAL_BADGE_SHA256" >&2
