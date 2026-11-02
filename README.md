@@ -10,6 +10,15 @@ the Mac, with these surfaces:
 
 ![macOS menu](docs/images/usage-popover.png)
 
+## Platform support
+
+The current application and downloadable installer support **macOS only**.
+There is no native Windows Codex Monitor build or installer yet. The Windows
+files under `ThirdParty/codex-usage-badge/windows` belong to the upstream
+Badge project; they are reference material and do not make Codex Monitor a
+Windows app. See the [Windows porting handoff](docs/windows-porting-handoff.md)
+for the current architecture and a copy-ready brief for a future port.
+
 ## What is included
 
 | Component | Data source | Default refresh |
@@ -94,6 +103,7 @@ Codex credentials, or quota usage. See [architecture and privacy](docs/architect
 
 - [macOS app and widgets](docs/setup-macos.md)
 - [architecture, data flow, and privacy](docs/architecture-and-privacy.md)
+- [Windows porting handoff](docs/windows-porting-handoff.md)
 - [release process](docs/releasing.md)
 - [contributing](CONTRIBUTING.md)
 - [security policy](SECURITY.md)

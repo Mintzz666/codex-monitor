@@ -33,10 +33,10 @@ IDs, provisioning profiles, or personal email addresses.
 
 ## 3. Build artifacts
 
-The current example is version 1.4.6, Build 43.
+The current release is version 1.4.9, Build 46.
 
 ```sh
-VERSION=1.4.6 BUILD_NUMBER=43 make release-package
+VERSION=1.4.9 BUILD_NUMBER=46 make release-package
 ```
 
 This creates:
@@ -79,3 +79,13 @@ only the current DMG and its matching checksum.
 - Confirm the source archive contains no ignored build or credential files.
 - Confirm the DMG reports the intended version and contains the widget.
 - Confirm the release contains only the macOS app and desktop widget extension.
+- Verify the app's `CFBundleShortVersionString`, `CFBundleVersion`, and public
+  `com.example` bundle identifiers from the newly built DMG before upload.
+- Verify the embedded Badge agent hash against the pinned value in
+  `Resources/CodexUsageBadge/manifest.json`.
+- Never upload a pre-existing DMG by filename alone. Build and checksum the
+  release asset in the same clean checkout, then verify the downloaded asset
+  and the app inside it.
+- State explicitly that the current release is macOS-only. Link the
+  [Windows porting handoff](windows-porting-handoff.md); do not describe the
+  upstream Badge Windows files as a Codex Monitor port.

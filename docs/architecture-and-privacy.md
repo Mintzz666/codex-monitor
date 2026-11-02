@@ -19,7 +19,12 @@ configurations can provide widget data through the local loopback usage bridge.
 
 The app launches the locally installed Codex app-server and requests account,
 rate-limit, and usage data. Codex owns authentication and token refresh. Codex
-Monitor does not parse browser storage or credential files.
+Monitor does not read browser storage. To detect an account change during a
+refresh, it reads only `auth_mode` and the account ID from the selected Codex
+home's local `auth.json` into process memory. It does not use, persist, log, or
+send access or refresh token values; the raw account ID is not included in
+snapshots or network requests. The included Badge helper uses the same minimal
+identity check before accepting a shared quota snapshot.
 
 Persisted macOS usage data is limited to display-oriented values such as quota
 percentage, reset time, recent daily token counts, and language. The repository

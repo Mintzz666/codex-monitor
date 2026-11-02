@@ -33,6 +33,7 @@ REQUIRED_PATHS = {
     "docs/images/usage-popover.png",
     "docs/release-notes/v1.4.6.md",
     "docs/setup-macos.md",
+    "docs/windows-porting-handoff.md",
     "project.yml",
 }
 FORBIDDEN_SUFFIXES = {

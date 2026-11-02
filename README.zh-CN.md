@@ -9,6 +9,14 @@ Codex Monitor 是一个非官方、本地优先的 Codex 用量看板。现在�
 
 ![macOS 菜单](docs/images/usage-popover.png)
 
+## 平台支持
+
+当前应用和下载包**只支持 macOS**，暂未提供原生 Windows 版 Codex Monitor
+或 Windows 安装包。`ThirdParty/codex-usage-badge/windows` 中的 Windows 文件
+属于上游 Badge 项目，只能作为参考，不能视为 Codex Monitor 已完成 Windows
+移植。计划由其他 Agent 移植时，请先阅读
+[Windows 移植交接说明](docs/windows-porting-handoff.md)。
+
 ## 包含内容
 
 | 组件 | 数据来源 | 默认刷新策略 |
@@ -87,6 +95,7 @@ macOS 端只启动本机已经安装的 `codex app-server`，调用 `account/rea
 
 - [macOS 应用和小组件](docs/setup-macos.md)
 - [架构、数据流与隐私](docs/architecture-and-privacy.md)
+- [Windows 移植交接说明](docs/windows-porting-handoff.md)
 - [发布流程](docs/releasing.md)
 - [参与贡献](CONTRIBUTING.md)
 - [安全策略](SECURITY.md)
