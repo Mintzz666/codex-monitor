@@ -29,6 +29,17 @@ one place. No separate Badge installation is required.
 <p align="center"><img src="docs/images/usage-popover-en.png" width="344" alt="Codex Monitor English menu preview with example usage values" /></p>
 <p align="center"><sub>Preview with example usage values. The app supports English and Simplified Chinese.</sub></p>
 
+## Sidebar colors that stay with your projects
+
+Assign one of seven colors to a project folder. Its conversations inherit that
+color, with five shades indicating cumulative Token ranges. Uniquely matched
+threads keep their project color in Recent; unresolved matches stay neutral.
+
+![Sidebar color illustration with fictional projects and conversations](docs/images/sidebar-colors-demo-en.svg)
+
+*Illustration based on the current color rules. All names are fictional; no
+real chats, file paths, account details or quota values are shown.*
+
 ## Get started
 
 1. Download the **universal DMG** from [the latest release](https://github.com/Mintzz666/codex-monitor/releases/latest).

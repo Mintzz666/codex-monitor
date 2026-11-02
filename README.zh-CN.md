@@ -28,6 +28,17 @@
 <p align="center"><img src="docs/images/usage-popover.png" width="344" alt="Codex Monitor 中文菜单示意图，使用演示用量数据" /></p>
 <p align="center"><sub>用量为演示数据。应用支持简体中文和 English。</sub></p>
 
+## 侧边栏颜色：项目与会话一眼对应
+
+项目文件夹可选择七种颜色，会话自动继承所属项目的色系，并用五级深浅表示
+累计 Token 区间。在 Recent 中，能唯一匹配到项目的会话也会延续项目颜色；
+无法明确匹配的条目保持中性色。
+
+![使用虚构项目和会话的侧边栏颜色示意](docs/images/sidebar-colors-demo-zh-CN.svg)
+
+*根据当前颜色规则绘制的界面示意。所有名称均为虚构，不包含真实聊天、文件路径、
+账号信息或额度数值。*
+
 ## 开始使用
 
 1. 从[最新发布页](https://github.com/Mintzz666/codex-monitor/releases/latest)下载 **通用 DMG**。
