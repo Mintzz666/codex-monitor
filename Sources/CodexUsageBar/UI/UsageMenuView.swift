@@ -12,56 +12,52 @@ private struct MenuTokenChartPoint: Identifiable {
 }
 
 struct UsageMenuView: View {
+  static let width: CGFloat = 344
+
   @ObservedObject var viewModel: UsageViewModel
+  @ObservedObject var badgeIntegrationModel: BadgeIntegrationViewModel
   @Binding var language: AppLanguage
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: 12) {
       header
       usageSection
       historySection
+      appearanceSection
 
       if let errorMessage = viewModel.errorDisplayText(for: language) {
         errorPanel(errorMessage)
       }
 
-      detailsSection
-      epdSection
       Divider()
       actionsSection
     }
-    .padding(18)
-    .frame(width: 366)
+    .padding(14)
+    .frame(width: Self.width)
     .environment(\.locale, language.locale)
     .task {
       await viewModel.refreshIfStale()
+      badgeIntegrationModel.refresh()
+    }
+  }
+
+  @ViewBuilder
+  private var appearanceSection: some View {
+    if #available(macOS 14.0, *) {
+      SettingsAppearanceSection(model: badgeIntegrationModel, language: $language)
+    } else {
+      WindowAppearanceSection(model: badgeIntegrationModel, language: $language)
     }
   }
 
   private var header: some View {
     HStack {
-      Image(nsImage: codexMonitorLogo)
-        .resizable()
-        .interpolation(.high)
-        .scaledToFit()
-        .scaleEffect(1.43)
-        .frame(width: 46, height: 46)
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-          RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .stroke(.primary.opacity(0.08), lineWidth: 1)
-        }
-        .accessibilityHidden(true)
-
       VStack(alignment: .leading, spacing: 3) {
         Text("Codex Monitor")
-          .font(.system(size: 18, weight: .bold, design: .rounded))
-        Text(
-          language.text(.subtitle)
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
+          .font(.system(size: 16, weight: .bold, design: .rounded))
+        Text(language.menuDateText(Date()))
+          .font(.caption2)
+          .foregroundStyle(.secondary)
       }
 
       Spacer()
@@ -93,28 +89,18 @@ struct UsageMenuView: View {
     }
   }
 
-  private var codexMonitorLogo: NSImage {
-    guard
-      let url = Bundle.main.url(
-        forResource: "AppIcon-1024",
-        withExtension: "png"
-      ),
-      let image = NSImage(contentsOf: url)
-    else {
-      return NSImage()
-    }
-    return image
-  }
-
   private var usageSection: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: 9) {
       HStack(alignment: .firstTextBaseline) {
         VStack(alignment: .leading, spacing: 2) {
           Text(language.text(.remainingQuota))
             .font(.headline)
-          Text(autoRefreshText)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
+          Text(
+            "\(language.text(.weeklyUsed)) "
+              + percentText(viewModel.snapshot?.usedPercent)
+          )
+          .font(.caption2)
+          .foregroundStyle(.secondary)
         }
         Spacer()
         Text(percentText(viewModel.snapshot?.remainingPercent))
@@ -129,21 +115,14 @@ struct UsageMenuView: View {
       .accessibilityLabel(language.text(.remainingQuota))
       .accessibilityValue(percentText(viewModel.snapshot?.remainingPercent))
 
-      HStack {
-        Text(language.text(.weeklyUsed))
-          .foregroundStyle(.secondary)
-        Spacer()
-        Text(percentText(viewModel.snapshot?.usedPercent))
-          .fontWeight(.medium)
-          .monospacedDigit()
-      }
-      .font(.subheadline)
-
       ForEach(viewModel.snapshot?.additionalWindows ?? []) { window in
         additionalWindowSection(window)
       }
+
+      Divider()
+      detailsSection
     }
-    .padding(14)
+    .padding(12)
     .background(
       LinearGradient(
         colors: [
@@ -181,7 +160,7 @@ struct UsageMenuView: View {
 
       HStack {
         Text(
-          "\(language.text(.weeklyUsed)) "
+          (language == .simplifiedChinese ? "已用 " : "Used ")
             + percentText(window.usedPercent)
         )
         Spacer()
@@ -197,32 +176,24 @@ struct UsageMenuView: View {
   }
 
   private var detailsSection: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "arrow.clockwise.circle.fill")
-        .font(.system(size: 24))
-        .foregroundStyle(Color.accentColor)
-
-      VStack(alignment: .leading, spacing: 2) {
-        Text(nextResetText)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-        Text(viewModel.resetDisplayText(for: language))
-          .font(.subheadline.weight(.semibold))
-          .monospacedDigit()
-      }
-
+    HStack(spacing: 8) {
+      Label(nextResetText, systemImage: "arrow.clockwise")
+        .foregroundStyle(.secondary)
       Spacer()
+      Text(viewModel.resetDisplayText(for: language))
+        .fontWeight(.medium)
+        .monospacedDigit()
     }
-    .padding(12)
-    .background(
-      .primary.opacity(0.045),
-      in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-    )
+    .font(.caption)
   }
 
   private var historySection: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack {
+    let resetEvents = Dictionary(
+      (viewModel.resetRadar?.events ?? []).map { ($0.dateKey(), $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    return VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 2) {
           Text(historyTitle)
             .font(.subheadline.weight(.semibold))
@@ -231,9 +202,14 @@ struct UsageMenuView: View {
             .foregroundStyle(.secondary)
         }
         Spacer()
-        Text(latestDailyTokenText)
-          .font(.subheadline.weight(.bold))
-          .monospacedDigit()
+        VStack(alignment: .trailing, spacing: 2) {
+          Text(language == .simplifiedChinese ? "今日" : "Today")
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(.secondary)
+          Text(latestDailyTokenText)
+            .font(.subheadline.weight(.bold))
+            .monospacedDigit()
+        }
       }
 
       if menuTokenPoints.isEmpty {
@@ -244,7 +220,7 @@ struct UsageMenuView: View {
         )
         .font(.caption)
         .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, minHeight: 112)
+        .frame(maxWidth: .infinity, minHeight: 124)
       } else {
         Chart(menuTokenPoints) { point in
           AreaMark(
@@ -274,8 +250,11 @@ struct UsageMenuView: View {
             y: .value("Tokens", Double(point.bucket.tokens))
           )
           .foregroundStyle(Color.accentColor)
-          .symbolSize(24)
+          .symbolSize(point.index == menuTokenPoints.count - 1 ? 34 : 18)
+          .accessibilityLabel(language.tokenFullDateLabel(point.bucket.startDate))
+          .accessibilityValue("\(point.bucket.tokens) Token")
         }
+        .chartXScale(domain: -0.3...6.3)
         .chartYScale(domain: 0...(menuTokenMaximum * 1.15))
         .chartYAxis {
           AxisMarks(values: .automatic(desiredCount: 3)) { value in
@@ -286,7 +265,7 @@ struct UsageMenuView: View {
                 Text(tokenText(Int64(number.rounded())))
               }
             }
-            .font(.system(size: 8))
+            .font(.system(size: 9))
           }
         }
         .chartXAxis {
@@ -300,17 +279,43 @@ struct UsageMenuView: View {
               if let index = value.as(Int.self),
                 menuTokenPoints.indices.contains(index)
               {
-                Text(dayLabel(menuTokenPoints[index].bucket.startDate))
-                  .font(.system(size: 8))
-                  .monospacedDigit()
+                dayAxisLabel(menuTokenPoints[index])
               }
             }
           }
         }
-        .frame(height: 112)
+        .chartOverlay { proxy in
+          GeometryReader { geometry in
+            ForEach(menuTokenPoints) { point in
+              if let event = resetEvents[point.bucket.startDate],
+                let x = proxy.position(forX: point.index)
+              {
+                Link(destination: event.sourceURL) {
+                  Text("RESET")
+                    .font(.system(size: 6.5, weight: .bold, design: .rounded))
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 2)
+                    .foregroundStyle(Color.green)
+                    .background(.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 3))
+                }
+                .buttonStyle(.plain)
+                .help(resetHelp(event))
+                .accessibilityLabel("RESET · \(language.tokenFullDateLabel(point.bucket.startDate))")
+                .position(
+                  x: geometry[proxy.plotAreaFrame].minX + x,
+                  y: geometry[proxy.plotAreaFrame].maxY + 38
+                )
+              }
+            }
+          }
+        }
+        .frame(height: 138)
       }
+
+      Divider()
+      resetForecastSection
     }
-    .padding(13)
+    .padding(12)
     .background(
       .primary.opacity(0.04),
       in: RoundedRectangle(cornerRadius: 13, style: .continuous)
@@ -318,9 +323,12 @@ struct UsageMenuView: View {
   }
 
   private var menuTokenPoints: [MenuTokenChartPoint] {
+    guard let dailyBuckets = viewModel.snapshot?.tokenUsage?.dailyBuckets,
+      !dailyBuckets.isEmpty
+    else { return [] }
     let buckets = DailyTokenSeries.sevenDaysEnding(
       on: Date(),
-      buckets: viewModel.snapshot?.tokenUsage?.dailyBuckets ?? []
+      buckets: dailyBuckets
     )
     return buckets.enumerated().map {
       MenuTokenChartPoint(index: $0.offset, bucket: $0.element)
@@ -339,16 +347,22 @@ struct UsageMenuView: View {
   }
 
   private var historyTitle: String {
-    language == .simplifiedChinese ? "近 7 日 Token 消耗" : "Daily tokens · 7 days"
+    language == .simplifiedChinese ? "近 7 日 Token" : "Tokens · 7 days"
   }
 
   private var historySubtitle: String {
-    return language == .simplifiedChinese
-      ? "每日独立统计 · 非累计"
-      : "Daily values · not cumulative"
+    guard let first = menuTokenPoints.first, let last = menuTokenPoints.last else {
+      return language == .simplifiedChinese ? "每日用量" : "Daily usage"
+    }
+    let range = "\(language.tokenDateLabel(first.bucket.startDate))–"
+      + language.tokenDateLabel(last.bucket.startDate)
+    return range + (language == .simplifiedChinese ? " · 每日用量" : " · Daily usage")
   }
 
   private func tokenText(_ tokens: Int64) -> String {
+    if tokens >= 1_000_000_000 {
+      return "\(String(format: "%.1f", Double(tokens) / 1_000_000_000))B"
+    }
     if tokens >= 1_000_000 {
       return "\(String(format: "%.1f", Double(tokens) / 1_000_000))M"
     }
@@ -358,10 +372,117 @@ struct UsageMenuView: View {
     return "\(tokens)"
   }
 
-  private func dayLabel(_ value: String) -> String {
-    let pieces = value.split(separator: "-")
-    guard pieces.count == 3 else { return value }
-    return Int(pieces[2]).map(String.init) ?? String(pieces[2])
+  private func dayAxisLabel(_ point: MenuTokenChartPoint) -> some View {
+    let isToday = point.index == menuTokenPoints.count - 1
+    return VStack(spacing: 2) {
+      Text(language.tokenDateLabel(point.bucket.startDate))
+        .fontWeight(isToday ? .semibold : .regular)
+        .monospacedDigit()
+      Text(language.tokenWeekdayLabel(point.bucket.startDate))
+        .opacity(isToday ? 1 : 0.7)
+    }
+    .font(.system(size: 9))
+    .foregroundStyle(isToday ? Color.accentColor : Color.secondary)
+    .padding(.horizontal, 3)
+    .padding(.vertical, 3)
+    .background(
+      isToday ? Color.accentColor.opacity(0.10) : .clear,
+      in: RoundedRectangle(cornerRadius: 5)
+    )
+    .padding(.bottom, 14)
+  }
+
+  private func resetHelp(_ event: GlobalResetEvent) -> String {
+    let description = language == .simplifiedChinese
+      ? "Tibo 全局重置完成记录（社区收录）"
+      : "Tibo global reset confirmation (community archive)"
+    return description + "\n" + language.resetDisplayText(event.confirmedAt)
+      + " · " + TimeZone.current.identifier + "\n" + event.sourceURL.absoluteString
+  }
+
+  private var resetForecastSection: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 8) {
+        Text(language == .simplifiedChinese ? "全局重置预测" : "Global reset")
+          .font(.caption.weight(.semibold))
+          .lineLimit(1)
+        Spacer(minLength: 8)
+        Text(radarStatusText)
+          .font(.system(size: 9))
+          .foregroundStyle(Color.secondary)
+          .lineLimit(1)
+      }
+      HStack(spacing: 8) {
+        forecastWindow(hours: 24, percent: viewModel.resetRadar?.forecast.percent24h)
+        forecastWindow(hours: 48, percent: viewModel.resetRadar?.forecast.percent48h)
+      }
+      HStack {
+        Link("codex-reset.com ↗", destination: ResetRadarClient.sourceURL)
+          .buttonStyle(.plain)
+          .foregroundStyle(Color.accentColor)
+        Spacer()
+        Text(
+          (language == .simplifiedChinese ? "更新 " : "Updated ")
+            + radarUpdateText
+        )
+        .foregroundStyle(.secondary)
+      }
+      .font(.system(size: 9))
+    }
+    .help(
+      language == .simplifiedChinese
+        ? "社区实验性概率，非官方时间表。RESET 为社区收录的 Tibo 完成记录，按本机时区显示；点击标记可看原帖。"
+        : "Experimental community estimates. RESET marks link to archived Tibo confirmations in your local time zone."
+    )
+  }
+
+  private func forecastWindow(hours: Int, percent: Double?) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 6) {
+      Text(language == .simplifiedChinese ? "\(hours)h 内" : "Within \(hours)h")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+      Spacer(minLength: 0)
+      Text(
+        radarForecastIsCurrent && percent != nil
+          ? "\(Int(percent!.rounded()))%" : "—"
+      )
+      .font(.system(size: 16, weight: .semibold, design: .rounded))
+      .monospacedDigit()
+    }
+    .padding(.horizontal, 8)
+    .padding(.vertical, 6)
+    .frame(maxWidth: .infinity)
+    .background(Color.accentColor.opacity(0.045), in: RoundedRectangle(cornerRadius: 7))
+  }
+
+  private var radarForecastIsCurrent: Bool {
+    viewModel.resetRadarError == nil && viewModel.resetRadar?.forecast.isFresh() == true
+  }
+
+  private var radarUpdateText: String {
+    guard let date = viewModel.resetRadar?.forecast.updatedAt else { return "—" }
+    let formatter = DateFormatter()
+    formatter.locale = language.locale
+    formatter.dateFormat = Calendar.current.isDateInToday(date) ? "HH:mm" : "M/d HH:mm"
+    return formatter.string(from: date)
+  }
+
+  private var radarStatusText: String {
+    if viewModel.resetRadarError != nil {
+      return language == .simplifiedChinese ? "来源暂不可用" : "Source unavailable"
+    }
+    guard let forecast = viewModel.resetRadar?.forecast else {
+      return language == .simplifiedChinese ? "等待来源" : "Waiting for source"
+    }
+    guard forecast.isFresh() else {
+      return language == .simplifiedChinese ? "预测已过期" : "Forecast expired"
+    }
+    switch forecast.confidence {
+    case "low": return language == .simplifiedChinese ? "社区 · 低置信度" : "Community · Low"
+    case "medium": return language == .simplifiedChinese ? "社区 · 中置信度" : "Community · Medium"
+    case "high": return language == .simplifiedChinese ? "社区 · 高置信度" : "Community · High"
+    default: return language == .simplifiedChinese ? "社区估计" : "Community estimate"
+    }
   }
 
   private var nextResetText: String {
@@ -369,39 +490,38 @@ struct UsageMenuView: View {
   }
 
   private var actionsSection: some View {
-    VStack(spacing: 10) {
-      HStack {
-        Label(autoRefreshText, systemImage: "arrow.triangle.2.circlepath")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-
-        Spacer()
-
-        Button {
-          Task { await viewModel.refresh() }
-        } label: {
-          Label(
-            language == .simplifiedChinese ? "刷新" : "Refresh",
-            systemImage: "arrow.clockwise"
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(spacing: 10) {
+        Toggle(
+          language.text(.launchAtLogin),
+          isOn: Binding(
+            get: { viewModel.launchAtLoginEnabled },
+            set: { viewModel.setLaunchAtLogin($0) }
           )
+        )
+        .toggleStyle(CompactSwitchToggleStyle())
+        .fixedSize()
+        Spacer(minLength: 4)
+        Text(viewModel.lastUpdatedDisplayText(for: language))
+          .font(.caption2.monospacedDigit())
+          .foregroundStyle(.secondary)
+          .help("\(language.text(.refreshTime)) · \(autoRefreshText)")
+        Button {
+          Task { await viewModel.refresh(forceRadar: true) }
+        } label: {
+          Image(systemName: "arrow.clockwise")
         }
         .keyboardShortcut("r")
         .disabled(viewModel.isRefreshing)
-
+        .help(language.text(.refreshNow))
+        .accessibilityLabel(language.text(.refreshNow))
         Button(language.text(.quit)) {
           NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
       }
-
-      Toggle(
-        language.text(.launchAtLogin),
-        isOn: Binding(
-          get: { viewModel.launchAtLoginEnabled },
-          set: { viewModel.setLaunchAtLogin($0) }
-        )
-      )
-      .toggleStyle(CompactSwitchToggleStyle())
+      .font(.caption)
+      .buttonStyle(.plain)
 
       if let launchAtLoginError =
         viewModel.launchAtLoginErrorText(for: language)
@@ -411,224 +531,6 @@ struct UsageMenuView: View {
           .foregroundStyle(.red)
           .fixedSize(horizontal: false, vertical: true)
       }
-    }
-  }
-
-  private var epdSection: some View {
-    VStack(alignment: .leading, spacing: 9) {
-      HStack(spacing: 8) {
-        Image(systemName: epdStatusSymbol)
-          .foregroundStyle(epdStatusColor)
-        VStack(alignment: .leading, spacing: 1) {
-          Text(language == .simplifiedChinese ? "墨水屏" : "E-paper display")
-            .font(.subheadline.weight(.semibold))
-          Text(epdStatusText)
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-        }
-        Spacer()
-
-        if viewModel.epdProbePhase.isBusy {
-          ProgressView()
-            .controlSize(.small)
-        } else {
-          Button(
-            viewModel.epdInformation == nil
-              ? (language == .simplifiedChinese ? "检测" : "Probe")
-              : (language == .simplifiedChinese ? "重新检测" : "Probe again")
-          ) {
-            viewModel.probeEPD()
-          }
-          .controlSize(.small)
-          .disabled(viewModel.isSendingEPDFrame)
-        }
-      }
-
-      if let information = viewModel.epdInformation {
-        if case .failed = viewModel.epdProbePhase {
-          Text(
-            language == .simplifiedChinese
-              ? "设备信息已缓存；当前蓝牙连接已结束。"
-              : "Device information is cached; Bluetooth is currently disconnected."
-          )
-          .font(.system(size: 9))
-          .foregroundStyle(.orange)
-        }
-        HStack(spacing: 12) {
-          epdMetric(
-            title: language == .simplifiedChinese ? "设备" : "Device",
-            value: information.device.name
-          )
-          epdMetric(
-            title: language == .simplifiedChinese ? "固件" : "Firmware",
-            value: information.firmwareVersion.map {
-              String(format: "0x%02X", $0)
-            } ?? "—"
-          )
-          epdMetric(
-            title: "MTU",
-            value: information.reportedMTU.map(String.init) ?? "—"
-          )
-          epdMetric(
-            title: language == .simplifiedChinese ? "信号" : "Signal",
-            value: information.device.signalStrength.map {
-              "\($0) dBm"
-            } ?? "—"
-          )
-        }
-        Text(information.driverDescription)
-          .font(.caption2.monospaced())
-          .foregroundStyle(
-            information.isStandardThreeColorDisplay
-              ? Color.secondary : Color.orange
-          )
-
-        HStack {
-          if viewModel.isSendingEPDFrame {
-            ProgressView()
-              .controlSize(.small)
-            Text(
-              language == .simplifiedChinese
-                ? "正在连接并逐包同步实时画面…"
-                : "Connecting and syncing live data…"
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-          } else if information.isStandardThreeColorDisplay {
-            Button(
-              language == .simplifiedChinese
-                ? "立即同步"
-                : "Sync now"
-            ) {
-              viewModel.sendEPDLiveFrame()
-            }
-            .controlSize(.small)
-          }
-          Spacer()
-        }
-
-        if let sendMessage = viewModel.epdSendMessage {
-          Text(epdSendDisplayText(sendMessage))
-            .font(.caption2)
-            .foregroundStyle(epdSendMessageColor(sendMessage))
-        }
-      } else {
-        Text(
-          language == .simplifiedChinese
-            ? "可先检测设备；自动同步也会自行查找 NRF_EPD_8042。"
-            : "Probe first, or let automatic sync find NRF_EPD_8042."
-        )
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-      }
-
-      Text(
-        language == .simplifiedChinese
-          ? "每小时自动同步 · 跨日强制 · 画面相同则跳过 · 发送后断开"
-          : "Hourly · forced after midnight · skips unchanged frames · disconnects after send"
-      )
-      .font(.system(size: 9))
-      .foregroundStyle(.tertiary)
-    }
-    .padding(12)
-    .background(
-      .primary.opacity(0.04),
-      in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-    )
-  }
-
-  private func epdMetric(title: String, value: String) -> some View {
-    VStack(alignment: .leading, spacing: 1) {
-      Text(title)
-        .font(.system(size: 8))
-        .foregroundStyle(.tertiary)
-      Text(value)
-        .font(.caption2.monospaced())
-        .lineLimit(1)
-    }
-  }
-
-  private var epdStatusText: String {
-    switch viewModel.epdProbePhase {
-    case .idle:
-      return language == .simplifiedChinese
-        ? "自动同步已启用，空闲时蓝牙断开"
-        : "Automatic sync enabled; Bluetooth is idle"
-    case .scanning:
-      return language == .simplifiedChinese ? "正在扫描附近设备…" : "Scanning…"
-    case .connecting(let name):
-      return language == .simplifiedChinese
-        ? "正在连接 \(name)…"
-        : "Connecting to \(name)…"
-    case .reading(let name):
-      return language == .simplifiedChinese
-        ? "正在读取 \(name) 配置…"
-        : "Reading \(name)…"
-    case .ready:
-      return language == .simplifiedChinese
-        ? "设备已记住，空闲时蓝牙断开"
-        : "Device remembered; Bluetooth is idle"
-    case .failed(let message):
-      return epdFailureDisplayText(message)
-    }
-  }
-
-  private func epdFailureDisplayText(_ message: String) -> String {
-    guard
-      message
-        == NRFEPDBluetoothError.gattHandshakeTimeout.errorDescription
-    else { return message }
-    return language == .simplifiedChinese
-      ? "仅扫描到设备广播，BLE 链路未建立；本次无法更新画面。"
-      : "Advertisement found, but no BLE link was established; this update cannot proceed."
-  }
-
-  private var epdStatusSymbol: String {
-    switch viewModel.epdProbePhase {
-    case .ready: return "checkmark.circle.fill"
-    case .failed: return "exclamationmark.triangle.fill"
-    case .scanning, .connecting, .reading: return "dot.radiowaves.left.and.right"
-    case .idle: return "rectangle.connected.to.line.below"
-    }
-  }
-
-  private var epdStatusColor: Color {
-    switch viewModel.epdProbePhase {
-    case .ready: return .green
-    case .failed: return .orange
-    case .scanning, .connecting, .reading: return .blue
-    case .idle: return .secondary
-    }
-  }
-
-  private func epdSendDisplayText(_ message: String) -> String {
-    switch message {
-    case "success":
-      return language == .simplifiedChinese
-        ? "同步完成，蓝牙已断开。"
-        : "Sync complete; Bluetooth disconnected."
-    case "auto-success":
-      return language == .simplifiedChinese
-        ? "自动同步完成，蓝牙已断开。"
-        : "Automatic sync complete; Bluetooth disconnected."
-    case "unchanged":
-      return language == .simplifiedChinese
-        ? "画面未变化，已跳过蓝牙传输。"
-        : "Frame unchanged; Bluetooth transfer skipped."
-    case "detected":
-      return language == .simplifiedChinese
-        ? "设备检测完成，蓝牙已断开。"
-        : "Probe complete; Bluetooth disconnected."
-    default:
-      return epdFailureDisplayText(message)
-    }
-  }
-
-  private func epdSendMessageColor(_ message: String) -> Color {
-    switch message {
-    case "success", "auto-success", "unchanged", "detected": return .green
-    default: return .orange
     }
   }
 
@@ -688,6 +590,66 @@ struct UsageMenuView: View {
       return language == .simplifiedChinese ? "\(hours) 小时窗口" : "\(hours)-hour window"
     }
     return language == .simplifiedChinese ? "\(minutes) 分钟窗口" : "\(minutes)-minute window"
+  }
+}
+
+private struct AppearanceIntegrationRow: View {
+  @ObservedObject var model: BadgeIntegrationViewModel
+  @Binding var language: AppLanguage
+  let onOpen: () -> Void
+
+  var body: some View {
+    Button(action: onOpen) {
+      HStack(spacing: 8) {
+        Image(systemName: model.isHealthy ? "circle.fill" : "circle.dashed")
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(model.isHealthy ? Color.green : Color.orange)
+        Text(language == .simplifiedChinese ? "ChatGPT 外观增强" : "ChatGPT appearance")
+          .font(.caption.weight(.medium))
+        Spacer(minLength: 4)
+        if model.isWorking {
+          ProgressView().controlSize(.mini)
+        } else {
+          Text(model.summary(for: language))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+        Image(systemName: "chevron.right")
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(.tertiary)
+      }
+      .contentShape(Rectangle())
+      .padding(.vertical, 3)
+    }
+    .buttonStyle(.plain)
+    .help(language == .simplifiedChinese ? "查看连接状态并管理外观增强" : "Check connection and manage the appearance add-on")
+    .accessibilityLabel(language == .simplifiedChinese ? "ChatGPT 外观增强，\(model.summary(for: language))" : "ChatGPT appearance, \(model.summary(for: language))")
+  }
+}
+
+@available(macOS 14.0, *)
+private struct SettingsAppearanceSection: View {
+  @ObservedObject var model: BadgeIntegrationViewModel
+  @Binding var language: AppLanguage
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    AppearanceIntegrationRow(model: model, language: $language) {
+      openSettings()
+    }
+  }
+}
+
+private struct WindowAppearanceSection: View {
+  @ObservedObject var model: BadgeIntegrationViewModel
+  @Binding var language: AppLanguage
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some View {
+    AppearanceIntegrationRow(model: model, language: $language) {
+      openWindow(id: "badge-integration")
+    }
   }
 }
 
@@ -795,12 +757,11 @@ private struct CompactSwitchToggleStyle: ToggleStyle {
     Button {
       configuration.isOn.toggle()
     } label: {
-      HStack {
+      HStack(spacing: 6) {
         configuration.label
-        Spacer()
         Capsule()
           .fill(configuration.isOn ? Color.accentColor : .secondary.opacity(0.25))
-          .frame(width: 34, height: 20)
+          .frame(width: 26, height: 16)
           .overlay(alignment: configuration.isOn ? .trailing : .leading) {
             Circle()
               .fill(.white)

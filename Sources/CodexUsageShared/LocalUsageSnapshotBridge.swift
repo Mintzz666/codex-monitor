@@ -74,6 +74,12 @@ public final class LocalUsageSnapshotServer: @unchecked Sendable {
     snapshotLock.unlock()
   }
 
+  public func invalidateSnapshot() {
+    snapshotLock.lock()
+    snapshot = nil
+    snapshotLock.unlock()
+  }
+
   public func updateLanguage(_ languageCode: String) {
     snapshotLock.lock()
     self.languageCode = languageCode

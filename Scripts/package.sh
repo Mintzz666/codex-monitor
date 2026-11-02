@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex Monitor"
-VERSION="${VERSION:-1.4.4}"
-BUILD_NUMBER="${BUILD_NUMBER:-40}"
+VERSION="${VERSION:-1.4.9}"
+BUILD_NUMBER="${BUILD_NUMBER:-46}"
 APP_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER:-com.example.codexmonitor}"
 APP_GROUP_IDENTIFIER="${APP_GROUP_IDENTIFIER:-group.com.example.codexmonitor}"
 WIDGET_BUNDLE_IDENTIFIER="${WIDGET_BUNDLE_IDENTIFIER:-com.example.codexmonitor.widget}"
@@ -16,6 +16,8 @@ WIDGET_DIR="$APP_DIR/Contents/PlugIns/CodexMonitorWidget.appex"
 ICON_PATH="$APP_DIR/Contents/Resources/AppIcon.icns"
 APP_EXECUTABLE="$APP_DIR/Contents/MacOS/$APP_NAME"
 WIDGET_EXECUTABLE="$WIDGET_DIR/Contents/MacOS/CodexMonitorWidget"
+BADGE_RESOURCES="$ROOT/Resources/CodexUsageBadge"
+PINNED_BADGE_SHA256="d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db"
 
 cd "$ROOT"
 
@@ -29,8 +31,28 @@ fi
 
 "$ROOT/Scripts/generate-project.sh"
 
-rm -rf "$APP_DIR"
+python3 "$ROOT/Scripts/verify_badge_bundle.py"
+
+CHATGPT_NODE="${CODEX_BADGE_NODE:-/Applications/ChatGPT.app/Contents/Resources/cua_node/bin/node}"
+if [[ ! -x "$CHATGPT_NODE" ]]; then
+  CHATGPT_NODE="$(command -v node || true)"
+fi
+if [[ -z "$CHATGPT_NODE" ]]; then
+  printf '%s\n' 'Node.js is required to validate the bundled Badge scripts.' >&2
+  exit 1
+fi
+while IFS= read -r -d '' script; do
+  "$CHATGPT_NODE" --check "$script"
+done < <(find "$BADGE_RESOURCES" -type f -name '*.cjs' -print0)
+
 mkdir -p "$ROOT/dist"
+if [[ -d "$APP_DIR" ]]; then
+  BACKUP_ARCHIVE="$ROOT/dist/backups/$(date +%Y%m%d-%H%M%S)/Codex Monitor-before-package.zip"
+  mkdir -p "$(dirname "$BACKUP_ARCHIVE")"
+  ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$BACKUP_ARCHIVE"
+  unzip -tqq "$BACKUP_ARCHIVE"
+fi
+rm -rf "$APP_DIR"
 
 xcodebuild \
   -quiet \
@@ -50,6 +72,14 @@ xcodebuild \
   build
 
 ditto "$APP_SOURCE" "$APP_DIR"
+
+mkdir -p "$APP_DIR/Contents/Resources"
+ditto "$BADGE_RESOURCES" "$APP_DIR/Contents/Resources/CodexUsageBadge"
+ACTUAL_BADGE_SHA256="$(shasum -a 256 "$APP_DIR/Contents/Resources/CodexUsageBadge/agent.cjs" | awk '{print $1}')"
+if [[ "$ACTUAL_BADGE_SHA256" != "$PINNED_BADGE_SHA256" ]]; then
+  printf 'Packaged Badge build hash mismatch: %s\n' "$ACTUAL_BADGE_SHA256" >&2
+  exit 1
+fi
 
 # Optional local artwork is not part of the public source distribution.
 if [[ -f "$ROOT/Resources/OfficialCodexMenuTemplate.png" ]]; then

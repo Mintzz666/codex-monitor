@@ -1,7 +1,7 @@
 import AppKit
 import CodexUsageShared
 import Combine
-import Darwin
+import Network
 import SwiftUI
 
 @main
@@ -10,36 +10,52 @@ struct CodexUsageBarApp: App {
 
   var body: some Scene {
     Settings {
-      EmptyView()
+      BadgeIntegrationSettingsView(model: appDelegate.badgeIntegrationModel)
     }
+    Window("ChatGPT 外观增强", id: "badge-integration") {
+      BadgeIntegrationSettingsView(model: appDelegate.badgeIntegrationModel)
+    }
+    .defaultSize(width: 520, height: 390)
+    .windowResizability(.contentSize)
   }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
   private let viewModel = UsageViewModel()
+  let badgeIntegrationModel = BadgeIntegrationViewModel()
   private var statusBarController: StatusBarController?
   private var wakeObserver: AnyCancellable?
+  private var networkMonitor: NWPathMonitor?
+  private var networkWasUnavailable = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApplication.shared.setActivationPolicy(.accessory)
-
-    if let epdSnapshotPath {
-      renderEPDSnapshot(to: epdSnapshotPath)
-      return
-    }
-
-    if epdProbeRequested {
-      runEPDHardwareProbe()
-      return
-    }
 
     if let documentationSnapshotPath {
       renderDocumentationSnapshot(to: documentationSnapshotPath)
       return
     }
 
-    statusBarController = StatusBarController(viewModel: viewModel)
+    statusBarController = StatusBarController(
+      viewModel: viewModel,
+      badgeIntegrationModel: badgeIntegrationModel
+    )
+    badgeIntegrationModel.refresh()
+    let monitor = NWPathMonitor()
+    monitor.pathUpdateHandler = { [weak self] path in
+      let available = path.status == .satisfied
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        let recovered = available && self.networkWasUnavailable
+        self.networkWasUnavailable = !available
+        if recovered {
+          await self.viewModel.refreshIfStale(maxAge: 0)
+        }
+      }
+    }
+    networkMonitor = monitor
+    monitor.start(queue: DispatchQueue(label: "com.example.codexmonitor.network"))
     wakeObserver = NSWorkspace.shared.notificationCenter
       .publisher(for: NSWorkspace.didWakeNotification)
       .receive(on: RunLoop.main)
@@ -53,22 +69,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
+  func applicationWillTerminate(_ notification: Notification) {
+    networkMonitor?.cancel()
+  }
+
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    false
+  }
+
   private var documentationSnapshotPath: String? {
     ProcessInfo.processInfo.environment[
       "CODEX_USAGE_BAR_DOCUMENTATION_SNAPSHOT"
     ]
-  }
-
-  private var epdSnapshotPath: String? {
-    ProcessInfo.processInfo.environment[
-      "CODEX_USAGE_BAR_EPD_SNAPSHOT"
-    ]
-  }
-
-  private var epdProbeRequested: Bool {
-    ProcessInfo.processInfo.environment[
-      "CODEX_USAGE_BAR_EPD_PROBE"
-    ] == "1"
   }
 
   private var documentationLanguage: AppLanguage {
@@ -95,79 +107,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     viewModel.loadDocumentationPreview(
       subscription: documentationSubscription
     )
-    do {
-      try DocumentationSnapshot.render(
-        viewModel: viewModel,
-        language: documentationLanguage,
-        to: path
-      )
-    } catch {
-      fputs("Documentation snapshot failed: \(error)\n", stderr)
-    }
-    NSApplication.shared.terminate(nil)
-  }
-
-  private func renderEPDSnapshot(to path: String) {
-    viewModel.loadDocumentationPreview(subscription: .codex)
-    do {
-      try viewModel.writeEPDDocumentationPreview(to: path)
-    } catch {
-      fputs("EPD snapshot failed: \(error)\n", stderr)
-    }
-    NSApplication.shared.terminate(nil)
-  }
-
-  private func runEPDHardwareProbe() {
     Task {
-      let transport = NRFEPDBluetoothTransport()
-      do {
-        writeProbeLine("EPD probe: scanning")
-        let devices = try await transport.scan()
-        writeProbeLine("EPD probe: found \(devices.count) compatible device(s)")
-        for device in devices {
-          let signal = device.signalStrength.map { "\($0) dBm" } ?? "unknown RSSI"
-          let connectability =
-            device.isConnectable.map {
-              $0 ? "connectable" : "not connectable"
-            } ?? "connectability unknown"
-          writeProbeLine("- \(device.name): \(signal), \(connectability)")
-        }
-
-        if let target = preferredProbeDevice(from: devices) {
-          writeProbeLine("EPD probe: connecting to \(target.name)")
-          try await transport.connect(to: target)
-          let information = try await transport.waitForInformation(
-            timeoutNanoseconds: 8_000_000_000
-          )
-          writeProbeLine(
-            "EPD probe: connected; \(information.driverDescription)"
-          )
-        }
-      } catch {
-        let message =
-          (error as? LocalizedError)?.errorDescription
-          ?? error.localizedDescription
-        writeProbeLine("EPD probe failed: \(message)")
+      if ProcessInfo.processInfo.environment["CODEX_USAGE_BAR_DOCUMENTATION_RADAR_LIVE"] == "1" {
+        await viewModel.refreshResetRadarIfStale(force: true)
       }
-      await transport.disconnect()
-      exit(EXIT_SUCCESS)
+      do {
+        try DocumentationSnapshot.render(
+          viewModel: viewModel,
+          language: documentationLanguage,
+          to: path
+        )
+      } catch {
+        fputs("Documentation snapshot failed: \(error)\n", stderr)
+      }
+      NSApplication.shared.terminate(nil)
     }
-  }
-
-  private func preferredProbeDevice(
-    from devices: [EPDDeviceDescriptor]
-  ) -> EPDDeviceDescriptor? {
-    let preferred = devices.filter {
-      NRFEPDDiscoveryPolicy.isPreferred8042($0.name)
-    }
-    let candidates = preferred.isEmpty ? devices : preferred
-    return candidates.sorted {
-      ($0.signalStrength ?? Int.min) > ($1.signalStrength ?? Int.min)
-    }.first
-  }
-
-  private func writeProbeLine(_ message: String) {
-    guard let data = "\(message)\n".data(using: .utf8) else { return }
-    FileHandle.standardOutput.write(data)
   }
 }

@@ -62,6 +62,12 @@ public struct SharedUsageStore {
     let data = try JSONEncoder().encode(snapshot)
     try data.write(to: fileURL, options: [.atomic])
   }
+
+  public func clear() throws {
+    guard let fileURL else { return }
+    guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+    try FileManager.default.removeItem(at: fileURL)
+  }
 }
 
 public struct SharedWidgetPreferences: Codable, Equatable, Sendable {

@@ -48,6 +48,9 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
   public let additionalWindows: [SharedUsageWindow]?
   public let dailyTokenUsage: [SharedDailyTokenUsage]?
   public let lifetimeTokens: Int64?
+  public let accountFingerprint: String?
+  public let rateLimitsJSON: String?
+  public let quotaSourceVersion: Int?
 
   public init(
     usedPercent: Double,
@@ -60,7 +63,10 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
     subscriptionID: String? = nil,
     additionalWindows: [SharedUsageWindow]? = nil,
     dailyTokenUsage: [SharedDailyTokenUsage]? = nil,
-    lifetimeTokens: Int64? = nil
+    lifetimeTokens: Int64? = nil,
+    accountFingerprint: String? = nil,
+    rateLimitsJSON: String? = nil,
+    quotaSourceVersion: Int? = nil
   ) {
     self.usedPercent = min(100, max(0, usedPercent))
     self.resetsAt = resetsAt
@@ -73,6 +79,9 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
     self.additionalWindows = additionalWindows
     self.dailyTokenUsage = dailyTokenUsage
     self.lifetimeTokens = lifetimeTokens
+    self.accountFingerprint = accountFingerprint
+    self.rateLimitsJSON = rateLimitsJSON
+    self.quotaSourceVersion = quotaSourceVersion
   }
 
   public var remainingPercent: Double {
@@ -84,6 +93,22 @@ public struct SharedUsageSnapshot: Codable, Equatable, Sendable {
     maxAge: TimeInterval = 15 * 60
   ) -> Bool {
     date.timeIntervalSince(updatedAt) > maxAge
+  }
+
+  public func withoutQuotaMetadata() -> SharedUsageSnapshot {
+    SharedUsageSnapshot(
+      usedPercent: usedPercent,
+      resetsAt: resetsAt,
+      planType: planType,
+      limitName: limitName,
+      updatedAt: updatedAt,
+      windowDurationMinutes: windowDurationMinutes,
+      languageCode: languageCode,
+      subscriptionID: subscriptionID,
+      additionalWindows: additionalWindows,
+      dailyTokenUsage: dailyTokenUsage,
+      lifetimeTokens: lifetimeTokens
+    )
   }
 }
 

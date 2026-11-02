@@ -1,0 +1,28 @@
+Codex Usage Badge 本机优化构建
+
+当前标准构建：mintzz-optimized-gpt-folder-sync-sg-sin（上游 v0.9.1）
+SHA-256：d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db
+版本记录核验日期：2026-10-04
+详细版本记录：当前优化版记录.json
+
+功能：
+- 对话标记直接读取其所在文件夹的颜色；切换 ChatGPT 与 Codex 视图时按当前界面关系重新映射。
+- “最近”中的重复对话按相同会话 ID 继承已确认的文件夹颜色；关系不唯一时不猜测。
+- 保留 Token 用量深浅层级、ChatGPT Work 标记贴合标题的排版，以及重置时间的 SIN 标记。
+
+更新后恢复此优化版：
+运行“恢复优化版.command”。脚本会核对固定 SHA-256，再替换 agent.cjs 并重启后台插件；不会退出 Codex/ChatGPT 客户端。
+
+如果自动启动偶尔没有显示外观：
+先完全退出 ChatGPT（⌘Q），再运行“启动ChatGPT并加载外观.command”。它会用本机连接参数启动 ChatGPT，并等待确认侧栏外观已注入。若客户端仍在运行，此入口不会强制关闭它。
+
+回退本次文件夹映射修复：
+运行“回退到GPT文件夹映射修复前.command”。它会恢复并校验之前的优化构建，不影响原版备份。
+
+重建本次优化构建：
+运行“rebuild-optimized.py”。它以本目录中的 backup-before-gpt-project-association/agent.cjs 为固定基线，并嵌入 source/ 下的定制模块。
+
+上游回退：
+“回退到原版.command”指向本机存档的 GitHub v0.9.1 原版。需要明确选择原版时再使用。
+
+说明：ChatGPT 客户端更新可能改变界面结构。当前修复按文件夹容器 ID 和本地会话 ID 关联颜色，并保留唯一名称匹配作为后备；没有明确关系的对话继续使用默认 Token 色阶。

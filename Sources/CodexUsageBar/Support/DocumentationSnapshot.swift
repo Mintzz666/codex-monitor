@@ -11,6 +11,7 @@ enum DocumentationSnapshot {
   ) throws {
     let content = UsageMenuView(
       viewModel: viewModel,
+      badgeIntegrationModel: BadgeIntegrationViewModel(),
       language: .constant(language)
     )
     .background(Color(nsColor: .windowBackgroundColor))
@@ -18,7 +19,7 @@ enum DocumentationSnapshot {
 
     let renderer = ImageRenderer(content: content)
     renderer.scale = 2
-    renderer.proposedSize = ProposedViewSize(width: 366, height: 780)
+    renderer.proposedSize = ProposedViewSize(width: UsageMenuView.width, height: nil)
 
     guard let image = renderer.cgImage else {
       throw DocumentationSnapshotError.renderFailed

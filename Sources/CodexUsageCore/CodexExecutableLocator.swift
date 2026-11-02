@@ -27,6 +27,7 @@ public enum CodexExecutableLocator {
     ]
     for bundleRoot in chatGPTBundleRoots {
       candidates.append(contentsOf: [
+        "\(bundleRoot)/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
         "\(bundleRoot)/Contents/Resources/codex",
         "\(bundleRoot)/Contents/SharedSupport/codex",
       ])

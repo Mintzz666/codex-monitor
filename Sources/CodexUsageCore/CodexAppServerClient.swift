@@ -1,11 +1,12 @@
 import Darwin
 import Foundation
+import SystemConfiguration
 
 public actor CodexAppServerClient {
   private let explicitExecutableURL: URL?
   private let timeout: TimeInterval
 
-  public init(executableURL: URL? = nil, timeout: TimeInterval = 10) {
+  public init(executableURL: URL? = nil, timeout: TimeInterval = 45) {
     explicitExecutableURL = executableURL
     self.timeout = timeout
   }
@@ -13,27 +14,34 @@ public actor CodexAppServerClient {
   public func fetchUsage() async throws -> UsageSnapshot {
     let executableURL = try explicitExecutableURL ?? CodexExecutableLocator.resolve()
     let timeout = timeout
-    let deadline = Date().addingTimeInterval(timeout)
+    let deadline = ProcessInfo.processInfo.systemUptime + timeout
 
     var lastError: Error?
     let configurations = CodexAppServerProbeConfiguration.candidates()
 
     for (index, configuration) in configurations.enumerated() {
-      let remaining = deadline.timeIntervalSinceNow
+      let remaining = deadline - ProcessInfo.processInfo.systemUptime
       guard remaining > 0 else {
         break
       }
+      let credentialIdentity = CredentialIdentity.current()
 
+      // Reserve time for the next attempt instead of letting the first slow
+      // connection consume the entire refresh deadline.
+      let attemptTimeout = remaining / Double(configurations.count - index)
       do {
         let responses = try await Task.detached(priority: .utility) {
           try CodexAppServerProbe(
             executableURL: executableURL,
             arguments: configuration.arguments,
             environment: configuration.environment
-          ).run(timeout: remaining)
+          ).run(timeout: attemptTimeout)
         }.value
 
-        return try decodeUsage(from: responses)
+        return try decodeUsage(
+          from: responses,
+          credentialIdentity: credentialIdentity
+        )
       } catch {
         lastError = error
         let canRetry =
@@ -48,14 +56,13 @@ public actor CodexAppServerClient {
     throw lastError ?? CodexAppServerClientError.timeout
   }
 
-  private func decodeUsage(from responses: [Int: Data]) throws -> UsageSnapshot {
+  private func decodeUsage(
+    from responses: [Int: Data],
+    credentialIdentity: CredentialIdentity?
+  ) throws -> UsageSnapshot {
     guard let accountData = responses[1] else {
       throw CodexAppServerClientError.missingResponse("account/read")
     }
-    guard let rateLimitsData = responses[2] else {
-      throw CodexAppServerClientError.missingResponse("account/rateLimits/read")
-    }
-
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let accountEnvelope = try decoder.decode(
@@ -64,6 +71,16 @@ public actor CodexAppServerClient {
     )
     if let error = accountEnvelope.error {
       throw error
+    }
+
+    if accountEnvelope.result?.requiresOpenaiAuth == true,
+      accountEnvelope.result?.account == nil
+    {
+      throw CodexAppServerClientError.notSignedIn
+    }
+
+    guard let rateLimitsData = responses[2] else {
+      throw CodexAppServerClientError.missingResponse("account/rateLimits/read")
     }
 
     let rateLimitsEnvelope = try decoder.decode(
@@ -77,10 +94,14 @@ public actor CodexAppServerClient {
       throw CodexAppServerClientError.missingResult("account/rateLimits/read")
     }
 
-    if accountEnvelope.result?.requiresOpenaiAuth == true,
-      accountEnvelope.result?.account == nil
-    {
-      throw CodexAppServerClientError.notSignedIn
+    let rawQuotaResult = responses[2].flatMap(parseRawQuotaResult)
+    if let credentialIdentity, let rawQuotaResult {
+      let accountIDValues = rawQuotaResult.accountIDValues
+      if accountIDValues.compactMap({ $0 }).contains(where: {
+        !credentialIdentity.matchesQuotaAccountID($0)
+      }) {
+        throw CredentialIdentityError.accountChanged
+      }
     }
 
     let selected = try WeeklyUsageSelector.select(
@@ -88,27 +109,101 @@ public actor CodexAppServerClient {
       accountPlanType: accountEnvelope.result?.account?.planType
     )
 
-    guard let usageData = responses[3],
+    let tokenUsage: TokenUsage?
+    if let usageData = responses[3],
       let usageEnvelope = try? decoder.decode(
         RPCEnvelope<AccountUsageReadResult>.self,
         from: usageData
       ),
       usageEnvelope.error == nil,
       let usage = usageEnvelope.result
-    else {
-      return selected
+    {
+      tokenUsage = TokenUsage(
+        lifetimeTokens: usage.summary?.lifetimeTokens,
+        peakDailyTokens: usage.summary?.peakDailyTokens,
+        currentStreakDays: usage.summary?.currentStreakDays,
+        dailyBuckets: (usage.dailyUsageBuckets ?? []).map {
+          DailyTokenUsage(startDate: $0.startDate, tokens: $0.tokens)
+        }
+      )
+    } else {
+      tokenUsage = nil
+    }
+    return try usageSnapshot(
+      selected,
+      tokenUsage: tokenUsage,
+      credentialIdentity: credentialIdentity,
+      rawQuotaResult: rawQuotaResult
+    )
+  }
+
+  private func usageSnapshot(
+    _ selected: UsageSnapshot,
+    tokenUsage: TokenUsage?,
+    credentialIdentity: CredentialIdentity?,
+    rawQuotaResult: RawQuotaResult?
+  ) throws -> UsageSnapshot {
+    var snapshot = selected.attaching(tokenUsage: tokenUsage)
+
+    if let credentialIdentity {
+      if let rawQuotaResult,
+        rawQuotaResult.accountIDFieldCount > 0,
+        rawQuotaResult.accountIDValues.count == rawQuotaResult.accountIDFieldCount,
+        rawQuotaResult.accountIDValues.allSatisfy({ $0 != nil }),
+        rawQuotaResult.accountIDValues.allSatisfy({
+          $0.map(credentialIdentity.matchesQuotaAccountID) ?? false
+        }),
+        let sanitizedJSON = rawQuotaResult.sanitizedJSON
+      {
+        snapshot = snapshot.attaching(
+          accountFingerprint: credentialIdentity.fingerprint,
+          rateLimitsJSON: sanitizedJSON
+        )
+      }
+
+      guard CredentialIdentity.currentFingerprint() == credentialIdentity.fingerprint
+      else {
+        throw CredentialIdentityError.accountChanged
+      }
     }
 
-    let tokenUsage = TokenUsage(
-      lifetimeTokens: usage.summary?.lifetimeTokens,
-      peakDailyTokens: usage.summary?.peakDailyTokens,
-      currentStreakDays: usage.summary?.currentStreakDays,
-      dailyBuckets: (usage.dailyUsageBuckets ?? []).map {
-        DailyTokenUsage(startDate: $0.startDate, tokens: $0.tokens)
-      }
-    )
-    return selected.attaching(tokenUsage: tokenUsage)
+    return snapshot
   }
+}
+
+private struct RawQuotaResult {
+  let accountIDFieldCount: Int
+  let accountIDValues: [String?]
+  let sanitizedJSON: String?
+}
+
+private func parseRawQuotaResult(from responseData: Data) -> RawQuotaResult? {
+  guard let response = try? JSONSerialization.jsonObject(with: responseData)
+    as? [String: Any],
+    var result = response["result"] as? [String: Any]
+  else {
+    return nil
+  }
+
+  let accountIDKeys = ["accountId", "account_id"].filter {
+    result[$0] != nil
+  }
+  let accountIDValues = accountIDKeys.map { result[$0] as? String }
+  for key in accountIDKeys {
+    result.removeValue(forKey: key)
+  }
+  guard let sanitizedData = try? JSONSerialization.data(
+    withJSONObject: result,
+    options: [.sortedKeys]
+  ), let sanitizedJSON = String(data: sanitizedData, encoding: .utf8) else {
+    return nil
+  }
+
+  return RawQuotaResult(
+    accountIDFieldCount: accountIDKeys.count,
+    accountIDValues: accountIDValues,
+    sanitizedJSON: sanitizedJSON
+  )
 }
 
 private struct CodexAppServerProbeConfiguration: Sendable {
@@ -116,7 +211,10 @@ private struct CodexAppServerProbeConfiguration: Sendable {
   let environment: [String: String]
 
   static func candidates() -> [Self] {
-    let environments = CodexAppServerProcessEnvironment.candidates()
+    // Finder/login-item launches do not inherit shell proxy variables. Read
+    // the current macOS proxy on every refresh so Clash port changes apply
+    // without hard-coding a port or changing the user's global routing.
+    let environment = CodexAppServerProcessEnvironment.resolve()
     // Keep the current flag first, then support the equivalent transport form
     // used by newer Codex CLI builds.
     let argumentVariants = [
@@ -124,15 +222,19 @@ private struct CodexAppServerProbeConfiguration: Sendable {
       ["app-server", "--listen", "stdio://"],
     ]
 
-    return argumentVariants.flatMap { arguments in
-      environments.map { environment in
-        Self(arguments: arguments, environment: environment)
-      }
+    return argumentVariants.map { arguments in
+      Self(arguments: arguments, environment: environment)
     }
   }
 
   static func shouldRetry(after error: Error) -> Bool {
     if let rpcError = error as? RPCErrorPayload {
+      let message = rpcError.message.lowercased()
+      if ["unauthorized", "forbidden", "not signed in", "401", "403"]
+        .contains(where: message.contains)
+      {
+        return false
+      }
       // -32603 is the app-server's usual upstream transport wrapper. The
       // -320xx range includes transient server overload responses.
       return rpcError.code == -32603
@@ -144,68 +246,87 @@ private struct CodexAppServerProbeConfiguration: Sendable {
       CodexAppServerClientError.terminated,
       CodexAppServerClientError.invalidProtocol:
       return true
+    case CredentialIdentityError.accountChanged:
+      return true
     default:
       return false
     }
   }
 }
 
-private enum CodexAppServerProcessEnvironment {
-  private static let chatGPTHosts = [
-    "chatgpt.com",
-    "*.chatgpt.com",
-    "chat.openai.com",
-    "*.chat.openai.com",
-  ]
-
-  static func candidates(
-    base: [String: String] = ProcessInfo.processInfo.environment
-  ) -> [[String: String]] {
-    // Prefer the user's normal route. If a stale system proxy blocks only the
-    // ChatGPT backend, retry with a scoped bypass before trying a full direct
-    // route as the last resort.
-    let bypassingSystemProxy = addingChatGPTNoProxy(to: base)
-    let bypassingAllProxies = addingNoProxyWildcard(to: base)
-    var candidates = [base]
-    if bypassingSystemProxy != base {
-      candidates.append(bypassingSystemProxy)
-    }
-    if bypassingAllProxies != base,
-      bypassingAllProxies != bypassingSystemProxy
-    {
-      candidates.append(bypassingAllProxies)
-    }
-    return candidates
-  }
-
-  private static func addingChatGPTNoProxy(
-    to environment: [String: String]
+public enum CodexAppServerProcessEnvironment {
+  public static func resolve(
+    base: [String: String] = ProcessInfo.processInfo.environment,
+    systemProxies: [String: Any]? = nil
   ) -> [String: String] {
-    var updated = environment
-    for key in ["NO_PROXY", "no_proxy"] {
-      var entries = (updated[key] ?? "")
+    let settings = systemProxies
+      ?? (SCDynamicStoreCopyProxies(nil) as? [String: Any] ?? [:])
+    var updated = base
+    for key in ["http_proxy", "https_proxy", "all_proxy", "no_proxy"] {
+      // reqwest/curl-style clients prefer lowercase. Keep both forms equal
+      // so subprocesses cannot accidentally select conflicting routes.
+      if let value = base[key] ?? base[key.uppercased()] {
+        updated[key] = value
+        updated[key.uppercased()] = value
+      }
+    }
+
+    if updated["all_proxy"] == nil {
+      for (key, prefix) in [("http_proxy", "HTTP"), ("https_proxy", "HTTPS")] {
+        if updated[key] == nil,
+          let proxy = proxyURL(prefix: prefix, scheme: "http", settings: settings)
+        {
+          updated[key] = proxy
+          updated[key.uppercased()] = proxy
+        }
+      }
+      if updated["http_proxy"] == nil, updated["https_proxy"] == nil,
+        let proxy = proxyURL(prefix: "SOCKS", scheme: "socks5h", settings: settings)
+      {
+        updated["all_proxy"] = proxy
+        updated["ALL_PROXY"] = proxy
+      }
+    }
+
+    if ["http_proxy", "https_proxy", "all_proxy"].contains(where: {
+      !(updated[$0] ?? "").isEmpty
+    }) {
+      var exceptions = (updated["no_proxy"] ?? "")
         .split(separator: ",")
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty }
-
-      if entries.contains("*") {
-        continue
+      let systemExceptions = (settings["ExceptionsList"] as? [String] ?? [])
+        .filter { $0 != "<local>" }
+        .map { $0.hasPrefix("*.") ? String($0.dropFirst()) : $0 }
+      for host in ["localhost", "127.0.0.1", "::1"] + systemExceptions
+        where !exceptions.contains(host)
+      {
+        exceptions.append(host)
       }
-      for host in chatGPTHosts where !entries.contains(host) {
-        entries.append(host)
-      }
-      updated[key] = entries.joined(separator: ",")
+      updated["no_proxy"] = exceptions.joined(separator: ",")
+      updated["NO_PROXY"] = updated["no_proxy"]
     }
     return updated
   }
 
-  private static func addingNoProxyWildcard(
-    to environment: [String: String]
-  ) -> [String: String] {
-    var updated = environment
-    updated["NO_PROXY"] = "*"
-    updated["no_proxy"] = "*"
-    return updated
+  private static func proxyURL(
+    prefix: String, scheme: String, settings: [String: Any]
+  ) -> String? {
+    guard (settings["\(prefix)Enable"] as? NSNumber)?.intValue == 1,
+      let rawHost = settings["\(prefix)Proxy"] as? String,
+      let port = (settings["\(prefix)Port"] as? NSNumber)?.intValue,
+      (1...65_535).contains(port)
+    else { return nil }
+    let host = rawHost.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !host.isEmpty,
+      host.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
+      host.rangeOfCharacter(from: CharacterSet(charactersIn: "/@?#")) == nil
+    else { return nil }
+    var components = URLComponents()
+    components.scheme = scheme
+    components.host = host
+    components.port = port
+    return components.url?.absoluteString
   }
 }
 
@@ -280,7 +401,7 @@ private struct CodexAppServerProbe: Sendable {
       to: inputHandle
     )
 
-    let deadline = Date().addingTimeInterval(timeout)
+    let deadline = ProcessInfo.processInfo.systemUptime + timeout
     var buffer = Data()
     var responses: [Int: Data] = [:]
     let outputDescriptor = outputHandle.fileDescriptor
@@ -297,12 +418,13 @@ private struct CodexAppServerProbe: Sendable {
     )
     var didSendInitialized = false
     var didSendAccountDataRequests = false
-    var accountDataRequestsSentAt: Date?
+    var rateLimitsReceivedAt: TimeInterval?
+    var didRetryRateLimitParameters = false
 
-    while Date() < deadline {
+    while ProcessInfo.processInfo.systemUptime < deadline {
       let remainingMilliseconds = max(
         1,
-        min(250, Int(deadline.timeIntervalSinceNow * 1_000))
+        min(250, Int((deadline - ProcessInfo.processInfo.systemUptime) * 1_000))
       )
       descriptor.revents = 0
       let pollResult = Darwin.poll(&descriptor, 1, Int32(remainingMilliseconds))
@@ -341,21 +463,45 @@ private struct CodexAppServerProbe: Sendable {
       }
 
       if responses[1] != nil, !didSendAccountDataRequests {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let account = try decoder.decode(RPCEnvelope<AccountReadResult>.self, from: responses[1]!)
+        if let error = account.error { throw error }
+        if account.result?.requiresOpenaiAuth == true, account.result?.account == nil {
+          throw CodexAppServerClientError.notSignedIn
+        }
         write(
-          "{\"method\":\"account/rateLimits/read\",\"id\":2}\n"
+          // Quota polling does not display reset-credit details. Avoid the
+          // separate upstream lookup (and its independent timeout).
+          "{\"method\":\"account/rateLimits/read\",\"id\":2,\"params\":{\"excludeResetCreditDetails\":true}}\n"
             + "{\"method\":\"account/usage/read\",\"id\":3}\n",
           to: inputHandle
         )
         didSendAccountDataRequests = true
-        accountDataRequestsSentAt = Date()
+      }
+
+      if let data = responses[2] {
+        let header = try JSONDecoder().decode(RPCResponseHeader.self, from: data)
+        if let error = header.error {
+          if error.code == -32602, !didRetryRateLimitParameters {
+            // Older CLI builds may not accept the background-poll parameter.
+            didRetryRateLimitParameters = true
+            responses.removeValue(forKey: 2)
+            write("{\"method\":\"account/rateLimits/read\",\"id\":2}\n", to: inputHandle)
+          } else {
+            throw error
+          }
+        } else if rateLimitsReceivedAt == nil {
+          rateLimitsReceivedAt = ProcessInfo.processInfo.systemUptime
+        }
       }
 
       if responses[1] != nil, responses[2] != nil {
         if responses[3] != nil {
           return responses
         }
-        if let accountDataRequestsSentAt,
-          Date().timeIntervalSince(accountDataRequestsSentAt) >= 2
+        if let rateLimitsReceivedAt,
+          ProcessInfo.processInfo.systemUptime - rateLimitsReceivedAt >= 2
         {
           return responses
         }
@@ -369,6 +515,11 @@ private struct CodexAppServerProbe: Sendable {
       }
     }
 
+    // Token activity is optional; a slow optional request must not discard a
+    // valid quota response that arrived just before the deadline.
+    if responses[1] != nil, responses[2] != nil {
+      return responses
+    }
     throw CodexAppServerClientError.timeout
   }
 

@@ -36,8 +36,6 @@
 	<string>$(APP_GROUP_IDENTIFIER)</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Codex Monitor uses Bluetooth to discover and update your NRF_EPD display.</string>
 	<key>NSSupportsAutomaticTermination</key>
 	<false/>
 </dict>

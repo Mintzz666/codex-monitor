@@ -235,6 +235,8 @@ public struct UsageSnapshot: Sendable, Equatable {
   public let reachedLimitType: String?
   public let additionalWindows: [UsageWindow]
   public let tokenUsage: TokenUsage?
+  public let accountFingerprint: String?
+  public let rateLimitsJSON: String?
 
   public init(
     usedPercent: Double,
@@ -244,7 +246,9 @@ public struct UsageSnapshot: Sendable, Equatable {
     limitName: String?,
     reachedLimitType: String?,
     additionalWindows: [UsageWindow] = [],
-    tokenUsage: TokenUsage? = nil
+    tokenUsage: TokenUsage? = nil,
+    accountFingerprint: String? = nil,
+    rateLimitsJSON: String? = nil
   ) {
     self.usedPercent = usedPercent
     self.windowDurationMinutes = windowDurationMinutes
@@ -254,6 +258,8 @@ public struct UsageSnapshot: Sendable, Equatable {
     self.reachedLimitType = reachedLimitType
     self.additionalWindows = additionalWindows
     self.tokenUsage = tokenUsage
+    self.accountFingerprint = accountFingerprint
+    self.rateLimitsJSON = rateLimitsJSON
   }
 
   public var remainingPercent: Double {
@@ -269,7 +275,27 @@ public struct UsageSnapshot: Sendable, Equatable {
       limitName: limitName,
       reachedLimitType: reachedLimitType,
       additionalWindows: additionalWindows,
-      tokenUsage: tokenUsage
+      tokenUsage: tokenUsage,
+      accountFingerprint: accountFingerprint,
+      rateLimitsJSON: rateLimitsJSON
+    )
+  }
+
+  public func attaching(
+    accountFingerprint: String?,
+    rateLimitsJSON: String?
+  ) -> UsageSnapshot {
+    UsageSnapshot(
+      usedPercent: usedPercent,
+      windowDurationMinutes: windowDurationMinutes,
+      resetsAt: resetsAt,
+      planType: planType,
+      limitName: limitName,
+      reachedLimitType: reachedLimitType,
+      additionalWindows: additionalWindows,
+      tokenUsage: tokenUsage,
+      accountFingerprint: accountFingerprint,
+      rateLimitsJSON: rateLimitsJSON
     )
   }
 }

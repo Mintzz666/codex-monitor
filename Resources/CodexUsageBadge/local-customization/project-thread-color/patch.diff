@@ -1,0 +1,274 @@
+diff --git a/src/project-colors.js b/src/project-colors.js
+index 2a8176b..646298f 100644
+--- a/src/project-colors.js
++++ b/src/project-colors.js
+@@ -1,5 +1,5 @@
+ function installProjectColors() {
+-  const VERSION = 2;
++  const VERSION = 4;
+   const KEY = '__codexProjectColors';
+   const PREFIX = 'codex-usage-badge.project-color.v1:';
+   const ROW = '[data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]';
+@@ -43,6 +43,11 @@ function installProjectColors() {
+       ?? row.closest('[data-sidebar-project-kind]')?.getAttribute('data-sidebar-project-kind') ?? 'project';
+     return PREFIX + kind + ':' + id;
+   }
++  function projectRowForName(name) {
++    if (typeof name !== 'string' || !name.length) return null;
++    const matches = [...document.querySelectorAll(ROW)].filter(row => row.getAttribute('data-app-action-sidebar-project-label') === name);
++    return matches.length === 1 ? matches[0] : null;
++  }
+   function readColor(key) {
+     try { const value = localStorage.getItem(key); storageAvailable = true; return allowed.has(value) ? value : null; }
+     catch { storageAvailable = false; return null; }
+@@ -104,7 +109,7 @@ function installProjectColors() {
+       } catch {
+         storageAvailable = false; error.hidden = false; error.textContent = '颜色保存失败，请重试'; return;
+       }
+-      paintRows(); render(); dismiss(menu);
++      paintRows(); render(); window.__codexThreadTokens?.refresh?.(); dismiss(menu);
+     }
+     reset.addEventListener('click', e => { e.stopPropagation(); save(null); });
+     root.addEventListener('pointerdown', e => e.stopPropagation());
+@@ -179,6 +184,12 @@ function installProjectColors() {
+   window.addEventListener('storage', onStorage);
+   window[KEY] = {
+     version: VERSION, refresh,
++    colorForProjectName(name) {
++      const row = projectRowForName(name);
++      const key = row && projectKey(row);
++      return key ? readColor(key) : null;
++    },
++    hasUniqueProjectName(name) { return !!projectRowForName(name); },
+     status() { return { version: VERSION, projectRows: document.querySelectorAll(ROW).length,
+       coloredIcons: document.querySelectorAll(`[${MARK}]`).length, palettes: [...menus.values()].filter(e => e.root.isConnected).length, storageAvailable }; },
+     destroy({ clearStorage = false } = {}) {
+diff --git a/src/thread-token-reader.js b/src/thread-token-reader.js
+index 8607d44..19e5e59 100644
+--- a/src/thread-token-reader.js
++++ b/src/thread-token-reader.js
+@@ -5,8 +5,9 @@ class ThreadTokenReader {
+   read(ids) {
+     const checkedAt = Date.now();
+     const totals = Object.create(null);
++    const projectNames = Object.create(null);
+     const requested = [...new Set(ids)].filter(id => typeof id === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)).slice(0, 2000);
+-    if (!requested.length) return { ok: true, totals, checkedAt };
++    if (!requested.length) return { ok: true, totals, projectNames, checkedAt };
+     let db;
+     try {
+       const fs = require('node:fs');
+@@ -14,18 +15,59 @@ class ThreadTokenReader {
+       // Follow the latest local state database; never fall back to an older account snapshot.
+       const file = fs.readdirSync(this.home).filter(name => /^state_\d+\.sqlite$/.test(name))
+         .sort((a, b) => Number(b.match(/\d+/)[0]) - Number(a.match(/\d+/)[0]))[0];
+-      if (!file) return { ok: false, totals, checkedAt };
++      if (!file) return { ok: false, totals, projectNames, checkedAt };
+       const { DatabaseSync } = require('node:sqlite');
+       db = new DatabaseSync(path.join(this.home, file), { readOnly: true, timeout: 200 });
+-      // These are the only two fields read: no titles, messages, auth, or conversation bodies.
++      // Read only token counts, cwd/project IDs, and project roots. Never read titles,
++      // messages, auth, or conversation bodies.
++      const threadColumns = new Set(db.prepare('PRAGMA table_info(threads)').all().map(row => row.name));
++      if (!threadColumns.has('id') || !threadColumns.has('tokens_used')) return { ok: false, totals, projectNames, checkedAt };
++      const hasProjectId = threadColumns.has('project_id');
++      const hasCwd = threadColumns.has('cwd');
++      let roots = [];
++      try {
++        const rootColumns = new Set(db.prepare('PRAGMA table_info(project_roots)').all().map(row => row.name));
++        if (rootColumns.has('project_id') && rootColumns.has('path')) roots = db.prepare('SELECT project_id, path FROM project_roots').all();
++      } catch { /* Folder association is optional; token totals remain readable. */ }
++      const projectNamesById = new Map();
++      try {
++        const projectColumns = new Set(db.prepare('PRAGMA table_info(projects)').all().map(row => row.name));
++        if (projectColumns.has('id') && projectColumns.has('name')) {
++          for (const row of db.prepare('SELECT id, name FROM projects').all()) {
++            if (row.id !== null && typeof row.name === 'string' && row.name.length) projectNamesById.set(String(row.id), row.name);
++          }
++        }
++      } catch { /* Without project labels, keep token totals and omit folder colors. */ }
++      const normalizedPath = value => {
++        if (typeof value !== 'string' || !path.isAbsolute(value)) return null;
++        return path.resolve(value);
++      };
++      const projectRoots = roots.map(row => ({ projectId: row.project_id, root: normalizedPath(row.path) }))
++        .filter(row => row.projectId !== null && row.root);
++      const projectFor = row => {
++        if (hasProjectId && row.project_id !== null && row.project_id !== undefined) return String(row.project_id);
++        const cwd = hasCwd ? normalizedPath(row.cwd) : null;
++        if (!cwd) return null;
++        const matches = projectRoots.filter(({ root }) => cwd === root || cwd.startsWith(root.endsWith(path.sep) ? root : root + path.sep));
++        if (!matches.length) return null;
++        const maxLength = Math.max(...matches.map(match => match.root.length));
++        const winners = new Set(matches.filter(match => match.root.length === maxLength).map(match => String(match.projectId)));
++        return winners.size === 1 ? [...winners][0] : null;
++      };
+       for (let i = 0; i < requested.length; i += 200) {
+         const chunk = requested.slice(i, i + 200);
+-        const rows = db.prepare(`SELECT id, tokens_used FROM threads WHERE id IN (${chunk.map(() => '?').join(',')})`).all(...chunk);
+-        for (const row of rows) if (Number.isSafeInteger(row.tokens_used) && row.tokens_used >= 0) totals[row.id] = row.tokens_used;
++        const fields = ['id', 'tokens_used', ...(hasProjectId ? ['project_id'] : []), ...(hasCwd ? ['cwd'] : [])];
++        const rows = db.prepare(`SELECT ${fields.join(', ')} FROM threads WHERE id IN (${chunk.map(() => '?').join(',')})`).all(...chunk);
++        for (const row of rows) {
++          if (Number.isSafeInteger(row.tokens_used) && row.tokens_used >= 0) totals[row.id] = row.tokens_used;
++          const projectId = projectFor(row);
++          const projectName = projectId === null ? null : projectNamesById.get(projectId);
++          if (projectName) projectNames[row.id] = projectName;
++        }
+       }
+-      return { ok: true, totals, checkedAt };
++      return { ok: true, totals, projectNames, checkedAt };
+     } catch {
+-      return { ok: false, totals: Object.create(null), checkedAt };
++      return { ok: false, totals: Object.create(null), projectNames: Object.create(null), checkedAt };
+     } finally { try { db?.close(); } catch {} }
+   }
+ }
+@@ -42,6 +84,7 @@ async function refreshThreadTokens(injector, reader) {
+   const snapshot = reader.read(requests.flatMap(r => r.ids));
+   await Promise.all(requests.map(async ({ session, ids }) => {
+     const totals = Object.fromEntries(ids.filter(id => Object.hasOwn(snapshot.totals, id)).map(id => [id, snapshot.totals[id]]));
+-    try { await session.evaluate(`window.__codexThreadTokens?.update(${JSON.stringify({ ...snapshot, totals })})`); } catch {}
++    const projectNames = Object.fromEntries(ids.filter(id => Object.hasOwn(snapshot.projectNames, id)).map(id => [id, snapshot.projectNames[id]]));
++    try { await session.evaluate(`window.__codexThreadTokens?.update(${JSON.stringify({ ...snapshot, totals, projectNames })})`); } catch {}
+   }));
+ }
+diff --git a/src/thread-tokens-ui.js b/src/thread-tokens-ui.js
+index b61ca12..4156500 100644
+--- a/src/thread-tokens-ui.js
++++ b/src/thread-tokens-ui.js
+@@ -1,11 +1,11 @@
+ function installThreadTokens() {
+-  const VERSION = 6;
++  const VERSION = 11;
+   const KEY = '__codexThreadTokens';
+   const ROW = '[data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-id]';
+   const MARK = 'data-codex-thread-tokens';
+   if (window[KEY]?.version === VERSION) { window[KEY].refresh(); return; }
+   window[KEY]?.destroy?.();
+-  let snapshot = { ok: false, totals: {}, checkedAt: null };
++  let snapshot = { ok: false, totals: {}, projectNames: {}, checkedAt: null };
+   let received = false;
+   let disposed = false;
+   let refreshTimer = null;
+@@ -13,11 +13,17 @@ function installThreadTokens() {
+   let hovered = null;
+   let pointer = null;
+   const badges = new Map();
++  const projectPalette = [
++    ['red', '#cf4b43', '#ff5f57'], ['orange', '#b76c10', '#ff9f0a'], ['yellow', '#92700b', '#ffd60a'],
++    ['green', '#268347', '#30d158'], ['blue', '#2674bf', '#0a84ff'], ['purple', '#9950c0', '#bf5af2'], ['gray', '#717980', '#98989d']
++  ];
++  const shadeMix = [18, 34, 54, 78, 100];
+   const style = document.createElement('style');
+   style.id = 'codex-thread-tokens-style';
+   style.textContent = `
+     [${MARK}] { --token-0: #d6dce2; --token-1: #c4d5ec; --token-2: #90b2e1; --token-3: #5e90d0; --token-4: #2f6ebf;
+       position: relative; display: inline-block; align-self: center; flex: 0 0 12px; width: 12px; height: 12px;
++      margin-inline-end: 8px; vertical-align: middle;
+       box-sizing: border-box; border-radius: 3px; border: 0; background: var(--token-0);
+       cursor: inherit; user-select: none; -webkit-app-region: no-drag; }
+     [${MARK}]::before { content: ''; position: absolute; inset: -6px; }
+@@ -35,6 +41,14 @@ function installThreadTokens() {
+     [${MARK}][data-level="2"] { background: var(--token-2); }
+     [${MARK}][data-level="3"] { background: var(--token-3); }
+     [${MARK}][data-level="4"] { background: var(--token-4); }
++    ${projectPalette.flatMap(([id, light]) => shadeMix.map((mix, level) =>
++      `[${MARK}][data-project-color="${id}"][data-level="${level}"] { background: color-mix(in srgb, ${light} ${mix}%, #ffffff); }`)).join('\n')}
++    ${projectPalette.flatMap(([id, , dark]) => shadeMix.map((mix, level) =>
++      `html.dark [${MARK}][data-project-color="${id}"][data-level="${level}"], html[data-theme="dark"] [${MARK}][data-project-color="${id}"][data-level="${level}"] { background: color-mix(in srgb, ${dark} ${mix}%, #282828) !important; }`)).join('\n')}
++    @media (prefers-color-scheme: dark) {
++      ${projectPalette.flatMap(([id, , dark]) => shadeMix.map((mix, level) =>
++        `html:not(.light):not([data-theme="light"]) [${MARK}][data-project-color="${id}"][data-level="${level}"] { background: color-mix(in srgb, ${dark} ${mix}%, #282828) !important; }`)).join('\n')}
++    }
+     #codex-thread-tokens-tooltip { position: fixed; z-index: 2147483000; pointer-events: none; box-sizing: border-box;
+       max-width: min(300px, calc(100vw - 16px)); padding: 9px 12px; border-radius: 9px; border: 1px solid #8883;
+       box-shadow: 0 4px 18px #0002; background: var(--color-surface-elevated-secondary, #f8f8f7);
+@@ -51,6 +65,25 @@ function installThreadTokens() {
+     const match = /^local:([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(key);
+     return { key, id: match && host === 'local' && kind === 'local' ? match[1] : null };
+   }
++  function markerSlot(title) {
++    // ChatGPT Work wraps thread titles in several block-level spans. Inserting
++    // beside the outer title creates a new flex/line item and distorts the list.
++    // Anchor beside its inline text run instead, without moving or wrapping text.
++    const walker = document.createTreeWalker(title, NodeFilter.SHOW_TEXT);
++    let textNode = null;
++    while (walker.nextNode()) textNode = walker.currentNode;
++    const leaf = textNode?.parentElement;
++    if (!leaf) return null;
++    const leafDisplay = getComputedStyle(leaf).display;
++    if (leafDisplay.startsWith('inline') && leaf.parentElement &&
++        getComputedStyle(leaf.parentElement).display.startsWith('inline')) {
++      return { parent: leaf.parentElement, before: leaf };
++    }
++    if (['block', 'flow-root', 'inline', 'inline-block', 'list-item', 'table-cell'].includes(leafDisplay)) {
++      return { parent: leaf, before: textNode };
++    }
++    return null;
++  }
+   function level(total) {
+     // Fixed thresholds keep the same color when the sidebar list changes.
+     if (total === 0) return 0;
+@@ -91,9 +124,15 @@ function installThreadTokens() {
+   }
+   function render(row, badge) {
+     const value = reading(row);
++    const id = identity(row).id;
++    const projectName = id ? snapshot.projectNames?.[id] : null;
++    const projectColor = projectName ? window.__codexProjectColors?.colorForProjectName?.(projectName) : null;
+     if (badge.textContent) badge.textContent = '';
+     const colorLevel = String(value.level ?? 0);
+     if (badge.dataset.level !== colorLevel) badge.dataset.level = colorLevel;
++    if (projectColor) {
++      if (badge.dataset.projectColor !== projectColor) badge.dataset.projectColor = projectColor;
++    } else if (badge.hasAttribute('data-project-color')) badge.removeAttribute('data-project-color');
+     if (badge.dataset.state !== value.state) badge.dataset.state = value.state;
+     const label = value.detail.replaceAll('\n', '，');
+     if (badge.getAttribute('aria-label') !== label) badge.setAttribute('aria-label', label);
+@@ -111,19 +150,22 @@ function installThreadTokens() {
+     for (const badge of document.querySelectorAll(`[${MARK}]`)) if (!owned.has(badge)) badge.remove();
+     for (const [row, badge] of badges) {
+       const title = row.querySelector('[data-thread-title]');
+-      if (!row.isConnected || !row.matches(ROW) || !title || badge.parentElement !== title.parentElement || badge.nextElementSibling !== title) {
++      const slot = title && markerSlot(title);
++      if (!row.isConnected || !row.matches(ROW) || !slot || badge.parentNode !== slot.parent || badge.nextSibling !== slot.before) {
+         if (hovered === badge) hideTooltip(); badge.remove(); badges.delete(row);
+       }
+     }
+     for (const row of document.querySelectorAll(ROW)) {
+       const title = row.querySelector('[data-thread-title]');
+       if (!title?.parentElement) continue;
++      const slot = markerSlot(title);
++      if (!slot) continue;
+       let badge = badges.get(row);
+       if (!badge) {
+-        // Own a sibling of the title. Never wrap or move React-owned content.
++        // Insert into the title's inline text flow; never wrap or move React content.
+         badge = document.createElement('span'); badge.setAttribute(MARK, ''); badge.setAttribute('role', 'img');
+         badge.setAttribute('aria-describedby', tooltip.id);
+-        title.before(badge); badges.set(row, badge);
++        slot.parent.insertBefore(badge, slot.before); badges.set(row, badge);
+       }
+       render(row, badge);
+     }
+@@ -189,11 +231,18 @@ function installThreadTokens() {
+     requestedIds() { return [...new Set([...document.querySelectorAll(ROW)].map(row => identity(row).id).filter(Boolean))].slice(0, 2000); },
+     update(next) {
+       snapshot = { ok: next?.ok === true, checkedAt: Number.isFinite(next?.checkedAt) ? next.checkedAt : null,
+-        totals: next?.totals && typeof next.totals === 'object' ? next.totals : {} };
++        totals: next?.totals && typeof next.totals === 'object' ? next.totals : {},
++        projectNames: next?.projectNames && typeof next.projectNames === 'object' ? next.projectNames : {} };
+       received = true; refresh();
+     },
+     status() { return { version: VERSION, badges: [...badges.values()].filter(el => el.isConnected).length,
+       available: [...badges.values()].filter(el => el.isConnected && el.dataset.state === 'ready').length,
++      projectMapped: [...badges].filter(([row, badge]) => badge.isConnected && !!snapshot.projectNames?.[identity(row).id]).length,
++      projectResolved: [...badges].filter(([row, badge]) => {
++        const name = snapshot.projectNames?.[identity(row).id];
++        return badge.isConnected && !!name && !!window.__codexProjectColors?.hasUniqueProjectName?.(name);
++      }).length,
++      projectColored: [...badges.values()].filter(el => el.isConnected && !!el.dataset.projectColor).length,
+       source: 'local-session-total', checkedAt: snapshot.checkedAt, ok: snapshot.ok }; },
+     destroy() {
+       disposed = true; observer.disconnect(); clearTimeout(refreshTimer); clearInterval(freshnessTimer); hideTooltip();

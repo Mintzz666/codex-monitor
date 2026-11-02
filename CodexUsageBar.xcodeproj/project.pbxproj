@@ -15,11 +15,8 @@
 		39E39D0DDB7A4A2991387D71 /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = D96640C4A38D4B0082BE7D2A /* AppIcon-1024.png */; };
 		3EB9B8473461E84AC7D12573 /* LocalUsageSnapshotBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB3CD68EC00EFF650449EE33 /* LocalUsageSnapshotBridge.swift */; };
 		478AE62507861F4B424B3782 /* UsageViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5964387CC7B9C1338680606C /* UsageViewModel.swift */; };
+		6244F47599EF45B7B08749AD /* BadgeIntegrationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A514F1A3E6E44E3A13C6E9B /* BadgeIntegrationViewModel.swift */; };
 		4E30216F25E52DFB4694ACC5 /* SharedUsageSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0683A565FCF517BCE9CC0E02 /* SharedUsageSnapshot.swift */; };
-		6B5D140916A84F6AA7A90110 /* EPDTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5D140916A84F6AA7A90111 /* EPDTransport.swift */; };
-		6B5D140916A84F6AA7A90112 /* NRFEPDBluetoothTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5D140916A84F6AA7A90113 /* NRFEPDBluetoothTransport.swift */; };
-		6B5D140916A84F6AA7A90114 /* EPDPreviewFrameLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5D140916A84F6AA7A90115 /* EPDPreviewFrameLoader.swift */; };
-		6B5D140916A84F6AA7A90116 /* epd-v1-preview.png in Resources */ = {isa = PBXBuildFile; fileRef = 6B5D140916A84F6AA7A90117 /* epd-v1-preview.png */; };
 		4F97F18AEBE689EDF3988B6F /* DocumentationSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57ECB92954168A746830981F /* DocumentationSnapshot.swift */; };
 		5207762E1C66FF0C8B645971 /* CodexExecutableLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9854879767FA111E08BD03 /* CodexExecutableLocator.swift */; };
 		551B965F108F917C29558DEA /* SharedUsageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2A1C90E38989E05CBB134D0 /* SharedUsageStore.swift */; };
@@ -32,6 +29,8 @@
 		F0F9459FB505DF4E428B5C1B /* CodexMonitorWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 40D04FF7EE0775B37B299FEC /* CodexMonitorWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F5670BE71FF3872AED5ED4AE /* CodexModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2598D59EB5DCF8B1060DE846 /* CodexModels.swift */; };
 		F5DA4D7C405913D0324BA5BB /* UsageSubscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAE7AC9F375D1BA2A45621B9 /* UsageSubscription.swift */; };
+		FAF1A77D0BC045E0B30F8218 /* ResetRadar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB01D1C86563434AA70C5B1A /* ResetRadar.swift */; };
+		C5073792D3AA40138911E5B4 /* CredentialIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B2D7ED635B4A2BA32B631A /* CredentialIdentity.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,10 +80,6 @@
 
 /* Begin PBXFileReference section */
 		0683A565FCF517BCE9CC0E02 /* SharedUsageSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedUsageSnapshot.swift; sourceTree = "<group>"; };
-		6B5D140916A84F6AA7A90111 /* EPDTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPDTransport.swift; sourceTree = "<group>"; };
-		6B5D140916A84F6AA7A90113 /* NRFEPDBluetoothTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NRFEPDBluetoothTransport.swift; sourceTree = "<group>"; };
-		6B5D140916A84F6AA7A90115 /* EPDPreviewFrameLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPDPreviewFrameLoader.swift; sourceTree = "<group>"; };
-		6B5D140916A84F6AA7A90117 /* epd-v1-preview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ../docs/images/epd-v1-preview.png; sourceTree = "<group>"; };
 		2598D59EB5DCF8B1060DE846 /* CodexModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexModels.swift; sourceTree = "<group>"; };
 		2B766DA68E8BCCD5AEB83F11 /* CodexAppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerClient.swift; sourceTree = "<group>"; };
 		30702127D771354F007969A4 /* WidgetLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetLanguage.swift; sourceTree = "<group>"; };
@@ -93,6 +88,7 @@
 		464C371BD43D481345921981 /* libCodexUsageShared.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCodexUsageShared.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		57ECB92954168A746830981F /* DocumentationSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentationSnapshot.swift; sourceTree = "<group>"; };
 		5964387CC7B9C1338680606C /* UsageViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageViewModel.swift; sourceTree = "<group>"; };
+		7A514F1A3E6E44E3A13C6E9B /* BadgeIntegrationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BadgeIntegrationViewModel.swift; sourceTree = "<group>"; };
 		715B1A9DFACEDD913D307D75 /* MenuBarLabel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarLabel.swift; sourceTree = "<group>"; };
 		7FCE3BE4C8AEFD6DBBEDDE34 /* CodexUsageBarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageBarApp.swift; sourceTree = "<group>"; };
 		966E4F72C09CBA6C5B7D1914 /* UsageMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageMenuView.swift; sourceTree = "<group>"; };
@@ -105,6 +101,8 @@
 		D96640C4A38D4B0082BE7D2A /* AppIcon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AppIcon/AppIcon-1024.png; sourceTree = "<group>"; };
 		E9F0D22719518AF71134EA29 /* Codex Monitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Codex Monitor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F87E3021DF7F9A701E8FDA81 /* CodexUsageWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageWidget.swift; sourceTree = "<group>"; };
+		EB01D1C86563434AA70C5B1A /* ResetRadar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResetRadar.swift; sourceTree = "<group>"; };
+		67B2D7ED635B4A2BA32B631A /* CredentialIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialIdentity.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -132,6 +130,7 @@
 			isa = PBXGroup;
 			children = (
 				5964387CC7B9C1338680606C /* UsageViewModel.swift */,
+				7A514F1A3E6E44E3A13C6E9B /* BadgeIntegrationViewModel.swift */,
 			);
 			path = State;
 			sourceTree = "<group>";
@@ -169,6 +168,8 @@
 				2B766DA68E8BCCD5AEB83F11 /* CodexAppServerClient.swift */,
 				3F9854879767FA111E08BD03 /* CodexExecutableLocator.swift */,
 				2598D59EB5DCF8B1060DE846 /* CodexModels.swift */,
+				67B2D7ED635B4A2BA32B631A /* CredentialIdentity.swift */,
+				EB01D1C86563434AA70C5B1A /* ResetRadar.swift */,
 			);
 			name = CodexUsageCore;
 			path = Sources/CodexUsageCore;
@@ -198,9 +199,6 @@
 		869892A46C75427198B75028 /* CodexUsageShared */ = {
 			isa = PBXGroup;
 			children = (
-				6B5D140916A84F6AA7A90111 /* EPDTransport.swift */,
-				6B5D140916A84F6AA7A90115 /* EPDPreviewFrameLoader.swift */,
-				6B5D140916A84F6AA7A90113 /* NRFEPDBluetoothTransport.swift */,
 				9F7F79DBC97C363AAAB5DFB9 /* AppLanguage.swift */,
 				CB3CD68EC00EFF650449EE33 /* LocalUsageSnapshotBridge.swift */,
 				0683A565FCF517BCE9CC0E02 /* SharedUsageSnapshot.swift */,
@@ -237,7 +235,6 @@
 			isa = PBXGroup;
 			children = (
 				A06D789516C01E0E027B38FF /* AppIcon.icns */,
-				6B5D140916A84F6AA7A90117 /* epd-v1-preview.png */,
 				D96640C4A38D4B0082BE7D2A /* AppIcon-1024.png */,
 			);
 			path = Resources;
@@ -371,7 +368,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				378B8A41218266EAF060B76C /* AppIcon.icns in Resources */,
-				6B5D140916A84F6AA7A90116 /* epd-v1-preview.png in Resources */,
 				39E39D0DDB7A4A2991387D71 /* AppIcon-1024.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -418,9 +414,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6B5D140916A84F6AA7A90110 /* EPDTransport.swift in Sources */,
-				6B5D140916A84F6AA7A90114 /* EPDPreviewFrameLoader.swift in Sources */,
-				6B5D140916A84F6AA7A90112 /* NRFEPDBluetoothTransport.swift in Sources */,
 				BED3C5D8D31711DBE430DB42 /* AppLanguage.swift in Sources */,
 				3EB9B8473461E84AC7D12573 /* LocalUsageSnapshotBridge.swift in Sources */,
 				4E30216F25E52DFB4694ACC5 /* SharedUsageSnapshot.swift in Sources */,
@@ -437,6 +430,8 @@
 				1D455EC2C019C40DACA5FD1A /* CodexAppServerClient.swift in Sources */,
 				5207762E1C66FF0C8B645971 /* CodexExecutableLocator.swift in Sources */,
 				F5670BE71FF3872AED5ED4AE /* CodexModels.swift in Sources */,
+				C5073792D3AA40138911E5B4 /* CredentialIdentity.swift in Sources */,
+				FAF1A77D0BC045E0B30F8218 /* ResetRadar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -446,6 +441,7 @@
 			files = (
 				118A4F7CB169754091C560AE /* CodexUsageBarApp.swift in Sources */,
 				4F97F18AEBE689EDF3988B6F /* DocumentationSnapshot.swift in Sources */,
+				6244F47599EF45B7B08749AD /* BadgeIntegrationViewModel.swift in Sources */,
 				04ACFF3F353C44F11D7A9FEC /* MenuBarLabel.swift in Sources */,
 				AF97574E9DF7F760F1AF0DBF /* UsageMenuView.swift in Sources */,
 				478AE62507861F4B424B3782 /* UsageViewModel.swift in Sources */,
@@ -547,7 +543,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 40;
+				CURRENT_PROJECT_VERSION = 46;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_LANGUAGE = zh_CN;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -568,7 +564,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.9;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -748,7 +744,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 40;
+				CURRENT_PROJECT_VERSION = 46;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_LANGUAGE = zh_CN;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -763,7 +759,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.4.4;
+				MARKETING_VERSION = 1.4.9;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

@@ -1,7 +1,7 @@
 # Public release process
 
-This repository publishes the macOS app, desktop widgets, and Bluetooth EPD
-support as source plus a universal macOS DMG. Mobile targets have been retired.
+This repository publishes the macOS app and desktop widgets as source plus a
+universal macOS DMG.
 
 ## 1. Update versions
 
@@ -28,20 +28,22 @@ The integration check is optional in CI but expected before a manual release on
 a Mac with a signed-in Codex installation.
 
 Inspect every changed screenshot. Do not publish real account IDs, OAuth codes,
-access/refresh tokens, private paths, Bluetooth UUIDs unique to a device, Apple
-Team IDs, provisioning profiles, or personal email addresses.
+access/refresh tokens, private paths, device-specific identifiers, Apple Team
+IDs, provisioning profiles, or personal email addresses.
 
 ## 3. Build artifacts
 
+The current example is version 1.4.6, Build 43.
+
 ```sh
-VERSION=1.4.4 BUILD_NUMBER=40 make release-package
+VERSION=1.4.6 BUILD_NUMBER=43 make release-package
 ```
 
 This creates:
 
 - `dist/Codex Monitor.app`
-- `dist/Codex-Monitor-v1.4.4-universal.dmg`
-- `dist/Codex-Monitor-v1.4.4-universal.dmg.sha256`
+- `dist/Codex-Monitor-v1.4.6-universal.dmg`
+- `dist/Codex-Monitor-v1.4.6-universal.dmg.sha256`
 
 Without signing environment variables, the output is ad-hoc signed. Optional
 notarization runs only when `APPLE_NOTARY_KEY_BASE64` and the related notary
@@ -52,7 +54,7 @@ Verify the checksum:
 
 ```sh
 cd dist
-shasum -a 256 -c Codex-Monitor-v1.4.4-universal.dmg.sha256
+shasum -a 256 -c Codex-Monitor-v1.4.6-universal.dmg.sha256
 ```
 
 ## 4. Tag and GitHub Release
@@ -62,11 +64,11 @@ release check and deterministic verifier, builds the DMG, and uploads the DMG
 and checksum to a GitHub Release.
 
 ```sh
-git tag -a v1.4.4 -m "Codex Monitor 1.4.4"
-git push origin v1.4.4
+git tag -a v1.4.6 -m "Codex Monitor 1.4.6"
+git push origin v1.4.6
 ```
 
-For a manual release, use the text in `docs/release-notes/v1.4.4.md` and upload
+For a manual release, use the text in `docs/release-notes/v1.4.6.md` and upload
 only the current DMG and its matching checksum.
 
 ## 5. Post-release verification

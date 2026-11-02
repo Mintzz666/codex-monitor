@@ -6,13 +6,14 @@
 macOS Codex login
       │ local JSON-RPC/stdin-stdout
       ▼
-codex app-server ──► macOS menu model ──► App Group snapshot ──► macOS Widget
-                           │
-                           └──► 400×300 renderer ──► short BLE session ──► EPD
+codex app-server ──► macOS menu model ──┬──► App Group snapshot ──► macOS Widget
+                                        └──► loopback usage bridge ──► macOS Widget (fallback)
+
+Codex Monitor ── unauthenticated public JSON ──► codex-reset.com
 ```
 
-The Bluetooth board never receives account credentials or raw server responses; it receives only
-two one-bit image planes.
+WidgetKit reads a sanitized App Group snapshot. Supported development and ad-hoc
+configurations can provide widget data through the local loopback usage bridge.
 
 ## macOS boundary
 
@@ -20,22 +21,52 @@ The app launches the locally installed Codex app-server and requests account,
 rate-limit, and usage data. Codex owns authentication and token refresh. Codex
 Monitor does not parse browser storage or credential files.
 
-Persisted macOS data is limited to display-oriented values such as quota
-percentage, reset time, recent daily token counts, language, remembered BLE
-device metadata, last EPD sync time, and a rendered-frame fingerprint. The
-repository contains no live account snapshot.
+Persisted macOS usage data is limited to display-oriented values such as quota
+percentage, reset time, recent daily token counts, and language. The repository
+contains no live account snapshot.
 
-## Bluetooth boundary
+## Global reset history and forecast
 
-The EPD receives final black and red pixels, not quota JSON, account IDs, access
-tokens, filenames, or computer information. BLE connections exist only while
-probing or transferring. Successful transfers end with an explicit disconnect.
+The app reads the public `GET /api/timeline` and `GET /api/forecast` endpoints
+from [codex-reset.com](https://codex-reset.com/developers). These requests need
+no authentication, use a marked `User-Agent`, and send no cookies, account
+identifiers, Codex credentials, or quota-usage values.
+
+The daily Token chart marks only community-history records that are confirmed,
+global resets. Banked resets and announcements or forecasts are excluded. Event
+dates are shown in the Mac's local time zone, and selecting a marker opens the
+original Tibo post. A marker documents a community-recorded global event; it
+does not verify delivery to any individual account.
+
+Below the chart, the app displays the source's raw 24-hour and 48-hour reset
+probabilities, plus its confidence and update time. It does not invent 12-hour
+or 36-hour values. While the app runs, it checks the source about every five
+minutes; manual refresh can request an update sooner. The client honors
+`Retry-After` on HTTP 429 responses. If a forecast is over 30 minutes old or a
+source check fails, the app hides the probability values and keeps cached reset
+history available.
 
 ## Network behavior
 
-- macOS: local Codex app-server; Codex itself may contact its service.
-- EPD: local Bluetooth only.
-- Project: no analytics, ads, telemetry SDK, cloud database, or maintainer API.
+- macOS: local Codex app-server and local widget data delivery; Codex itself may
+  contact its service.
+- GUI launches translate the active macOS HTTP/HTTPS proxy settings into the
+  app-server's process environment (including Clash's configured port). Explicit
+  environment proxies take precedence. Proxy ports and nodes are not hard-coded;
+  the app does not change Clash rules, nodes, TUN, or the system proxy. There is
+  no automatic ChatGPT or wildcard proxy bypass.
+- A refresh has a 45-second budget, divided between two attempts, and supports
+  both stdio CLI argument forms. Transient errors can retry; authentication
+  failures are reported without repeated launches. Quota polling skips the
+  separate reset-credit detail request, with a compatibility fallback for older
+  CLIs. Optional token-activity failures do not discard a successful quota read.
+- Successful background refreshes wait one minute between polls. Failed reads
+  retry after 15, 30, then 60 seconds. Network recovery triggers a refresh, and
+  the existing wake handler refreshes stale data. These hooks run inside the app.
+- Reset data: unauthenticated public JSON requests to codex-reset.com; no
+  account-specific data is sent.
+- Project: no analytics, ads, telemetry SDK, cloud database, or Codex
+  Monitor-operated backend.
 
 ## Public-release privacy controls
 

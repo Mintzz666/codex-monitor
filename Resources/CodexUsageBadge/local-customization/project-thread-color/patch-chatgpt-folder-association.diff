@@ -1,0 +1,158 @@
+--- agent.cjs.before
++++ agent.cjs.after
+@@ -460,7 +460,7 @@
+ }
+ 
+ function installProjectColors() {
+-  const VERSION = 4;
++  const VERSION = 5;
+   const KEY = '__codexProjectColors';
+   const PREFIX = 'codex-usage-badge.project-color.v1:';
+   const ROW = '[data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]';
+@@ -650,6 +650,10 @@
+       const key = row && projectKey(row);
+       return key ? readColor(key) : null;
+     },
++    colorForProjectRow(row) {
++      const key = row?.matches?.(ROW) ? projectKey(row) : null;
++      return key ? readColor(key) : null;
++    },
+     hasUniqueProjectName(name) { return !!projectRowForName(name); },
+     status() { return { version: VERSION, projectRows: document.querySelectorAll(ROW).length,
+       coloredIcons: document.querySelectorAll(`[${MARK}]`).length, palettes: [...menus.values()].filter(e => e.root.isConnected).length, storageAvailable }; },
+@@ -666,11 +670,12 @@
+   };
+   refresh();
+ }
+-
+ function installThreadTokens() {
+-  const VERSION = 11;
++  const VERSION = 12;
+   const KEY = '__codexThreadTokens';
+   const ROW = '[data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-id]';
++  const PROJECT_ROW = '[data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]';
++  const PROJECT_CONTAINER = '[data-sidebar-project-container-id^="project:"]';
+   const MARK = 'data-codex-thread-tokens';
+   if (window[KEY]?.version === VERSION) { window[KEY].refresh(); return; }
+   window[KEY]?.destroy?.();
+@@ -727,12 +732,44 @@
+     #codex-thread-tokens-tooltip[hidden] { display: none !important; }
+   `;
+   const tooltip = document.createElement('div'); tooltip.id = 'codex-thread-tokens-tooltip'; tooltip.setAttribute('role', 'tooltip'); tooltip.hidden = true;
++  let projectAssignments = new Map();
+   function identity(row) {
+     const key = row.getAttribute('data-app-action-sidebar-thread-id') ?? '';
+     const host = row.getAttribute('data-app-action-sidebar-thread-host-id');
+     const kind = row.getAttribute('data-app-action-sidebar-thread-kind');
+     const match = /^local:([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.exec(key);
+     return { key, id: match && host === 'local' && kind === 'local' ? match[1] : null };
++  }
++  function projectContext(row) {
++    const container = row.closest(PROJECT_CONTAINER);
++    if (!container) return null;
++    const containerId = container.getAttribute('data-sidebar-project-container-id') ?? '';
++    if (!containerId.startsWith('project:')) return null;
++    const projectId = containerId.slice('project:'.length);
++    if (!projectId) return null;
++    const matches = [...container.querySelectorAll(PROJECT_ROW)].filter(projectRow =>
++      projectRow.closest(PROJECT_CONTAINER) === container &&
++      projectRow.getAttribute('data-app-action-sidebar-project-id') === projectId);
++    if (matches.length !== 1) return null;
++    const projectRow = matches[0];
++    const api = window.__codexProjectColors;
++    if (typeof api?.colorForProjectRow !== 'function') return null;
++    const kind = projectRow.querySelector('[data-sidebar-project-kind]')?.getAttribute('data-sidebar-project-kind')
++      ?? projectRow.closest('[data-sidebar-project-kind]')?.getAttribute('data-sidebar-project-kind') ?? 'project';
++    return { key: `${kind}:${projectId}`, color: api.colorForProjectRow(projectRow) };
++  }
++  function buildProjectAssignments(rows) {
++    const assignments = new Map();
++    for (const row of rows) {
++      const id = identity(row).id;
++      if (!id) continue;
++      const context = projectContext(row);
++      if (!context) continue;
++      const current = assignments.get(id);
++      if (!current) assignments.set(id, context);
++      else if (current.key !== context.key) assignments.set(id, { ambiguous: true });
++    }
++    return assignments;
+   }
+   function markerSlot(title) {
+     // ChatGPT Work wraps thread titles in several block-level spans. Inserting
+@@ -794,8 +831,11 @@
+   function render(row, badge) {
+     const value = reading(row);
+     const id = identity(row).id;
++    const assignment = id ? projectAssignments.get(id) : null;
+     const projectName = id ? snapshot.projectNames?.[id] : null;
+-    const projectColor = projectName ? window.__codexProjectColors?.colorForProjectName?.(projectName) : null;
++    const projectColor = assignment
++      ? (assignment.ambiguous ? null : assignment.color)
++      : (projectName ? window.__codexProjectColors?.colorForProjectName?.(projectName) : null);
+     if (badge.textContent) badge.textContent = '';
+     const colorLevel = String(value.level ?? 0);
+     if (badge.dataset.level !== colorLevel) badge.dataset.level = colorLevel;
+@@ -815,6 +855,8 @@
+     if (disposed || !document.body) return;
+     if (!style.isConnected) (document.head ?? document.documentElement).append(style);
+     if (!tooltip.isConnected) document.body.append(tooltip);
++    const rows = [...document.querySelectorAll(ROW)];
++    projectAssignments = buildProjectAssignments(rows);
+     const owned = new Set(badges.values());
+     for (const badge of document.querySelectorAll(`[${MARK}]`)) if (!owned.has(badge)) badge.remove();
+     for (const [row, badge] of badges) {
+@@ -824,7 +866,7 @@
+         if (hovered === badge) hideTooltip(); badge.remove(); badges.delete(row);
+       }
+     }
+-    for (const row of document.querySelectorAll(ROW)) {
++    for (const row of rows) {
+       const title = row.querySelector('[data-thread-title]');
+       if (!title?.parentElement) continue;
+       const slot = markerSlot(title);
+@@ -883,7 +925,8 @@
+     if (records.some(r => !r.target.closest?.(`[${MARK}]`) && r.target !== tooltip && !tooltip.contains(r.target) && r.target !== style)) scheduleRefresh();
+   });
+   observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true,
+-    attributeFilter: ['data-app-action-sidebar-thread-id', 'data-app-action-sidebar-thread-host-id', 'data-app-action-sidebar-thread-kind'] });
++    attributeFilter: ['data-app-action-sidebar-thread-id', 'data-app-action-sidebar-thread-host-id', 'data-app-action-sidebar-thread-kind',
++      'data-app-action-sidebar-project-id', 'data-sidebar-project-kind', 'data-sidebar-project-container-id'] });
+   const freshnessTimer = setInterval(() => { for (const [row, badge] of badges) render(row, badge); }, 1000);
+   // Capture before the native sidebar can stop bubbling; movement also repairs missed enters.
+   document.addEventListener('pointerover', onPointer, true);
+@@ -906,9 +949,16 @@
+     },
+     status() { return { version: VERSION, badges: [...badges.values()].filter(el => el.isConnected).length,
+       available: [...badges.values()].filter(el => el.isConnected && el.dataset.state === 'ready').length,
+-      projectMapped: [...badges].filter(([row, badge]) => badge.isConnected && !!snapshot.projectNames?.[identity(row).id]).length,
++      projectMapped: [...badges].filter(([row, badge]) => {
++        const id = identity(row).id;
++        return badge.isConnected && (!!snapshot.projectNames?.[id] || !!projectAssignments.get(id));
++      }).length,
+       projectResolved: [...badges].filter(([row, badge]) => {
+-        const name = snapshot.projectNames?.[identity(row).id];
++        if (!badge.isConnected) return false;
++        const id = identity(row).id;
++        const assignment = projectAssignments.get(id);
++        if (assignment) return !assignment.ambiguous;
++        const name = snapshot.projectNames?.[id];
+         return badge.isConnected && !!name && !!window.__codexProjectColors?.hasUniqueProjectName?.(name);
+       }).length,
+       projectColored: [...badges.values()].filter(el => el.isConnected && !!el.dataset.projectColor).length,
+@@ -925,7 +975,6 @@
+   };
+   refresh();
+ }
+-
+ function isMainWindow(target) {
+   try {
+     const u=new URL(target?.url || '');
+@@ -1130,7 +1179,6 @@
+     try { await session.evaluate(`window.__codexThreadTokens?.update(${JSON.stringify({ ...snapshot, totals, projectNames })})`); } catch {}
+   }));
+ }
+-
+ var AGENT_VERSION = '0.9.1';
+ function parseArgs(argv) {
+   const options = {

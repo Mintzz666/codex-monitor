@@ -89,9 +89,9 @@ then Run. The built product is `Codex Monitor.app`.
 
 For a local update, run `make install`. It preserves the identifiers of the app
 already in `/Applications`, saves a rollback copy under `dist/backups/`, then
-replaces and opens the application. No device preferences are removed.
+replaces and opens the application.
 Use `BUILD_ARCHS="$(uname -m)" make install` for a faster build for this Mac only.
-Full Xcode is still required; the iPhone targets have been removed.
+Full Xcode is still required.
 
 
 1. Move `Codex Monitor.app` to `/Applications` and launch it once.
@@ -102,9 +102,21 @@ Full Xcode is still required; the iPhone targets have been removed.
    the menu panel.
 
 The menu refreshes once per minute, checks stale data after wake, and supports
-manual refresh with Command-R. The panel scrolls to fit the display.
-Turning off launch at login is remembered after restarting the app. WidgetKit controls widget scheduling; the
+manual refresh with Command-R. The panel height adapts to its contents and stays
+scrollable on displays with limited height. Turning off launch at login is
+remembered after restarting the app. WidgetKit controls widget scheduling; the
 app publishes only a sanitized quota snapshot.
+
+The daily Token chart can show `RESET` markers for confirmed global events in
+the community history. Dates follow the Mac's local time zone, and selecting a
+marker opens the original Tibo post. These records describe public global
+events; they do not confirm that an individual account received a reset. The
+forecast below the chart shows only codex-reset.com's raw 24-hour and 48-hour
+probabilities, with confidence and source update time. The app reads public JSON
+without authentication and does not send account, credential, or quota-usage
+data. It checks about every five minutes while running; Command-R can refresh
+manually. A forecast older than 30 minutes or a failed source check hides the
+percentages while preserving cached history.
 
 ## 6. Common failures / 常见问题
 
@@ -114,6 +126,12 @@ app publishes only a sanitized quota snapshot.
 - Run `codex --version` in Terminal.
 - Run `make integration-test` from the repository.
 - If using a custom binary, launch with a valid `CODEX_BINARY_PATH`.
+- When using Clash, keep its normal system proxy enabled. GUI launches now
+  inherit the active macOS HTTP/HTTPS proxy without shell configuration or a
+  fixed port. Explicit proxy environment variables still take precedence.
+- Allow up to 45 seconds for a refresh during slow upstream responses. The app
+  retries transient failures and refreshes when network connectivity returns.
+  It does not change Clash rules, subscriptions, nodes, or TUN settings.
 
 ### Widget does not update
 
@@ -130,6 +148,14 @@ launch, or build locally with your own Development Team.
 ## 中文摘要
 
 Mac 端不保存 Codex 登录令牌。它启动本机 Codex app-server，读取周额度和
-Token 用量，再把脱敏快照交给小组件。菜单每分钟刷新；小组件由 WidgetKit
-安排刷新。公开源码使用 `com.example` 占位标识，正式签名时必须替换为你自己
-团队下的唯一 Bundle ID 与 App Group。
+Token 用量，再把脱敏快照通过 App Group 提供给小组件；受支持的开发和临时
+签名构建也可使用本机回环 usage bridge。正常读取后每分钟刷新；连接失败时
+按 15、30、60 秒退避重试，网络恢复后立即刷新。Clash 用户可继续使用系统
+代理，应用自动读取当前端口，不修改全局网络设置。面板高度随内容
+调整，在屏幕高度不足时可滚动；小组件由 WidgetKit 安排刷新。公开源码使用
+`com.example` 占位标识，正式签名时必须替换为你自己团队下的唯一 Bundle ID
+与 App Group。每日 Token 图表会按本机时区标记社区记录中已确认的全局
+重置，点击可查看 Tibo 原帖；这不代表个人账号已获得重置。图表下方只显示
+codex-reset.com 提供的 24 小时和 48 小时预测与置信度、更新时间。应用每约
+5 分钟检查一次，支持手动刷新；不向来源发送账号、凭据或用量数据。数据
+过期或来源检查失败时隐藏百分比，并保留缓存的历史记录。

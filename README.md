@@ -5,13 +5,10 @@
 Codex Monitor is an unofficial, local-first dashboard for Codex usage. It focuses on
 the Mac, with these surfaces:
 
-- a native macOS menu bar app with medium and large WidgetKit widgets;
-- a 400 × 300 black/white/red Bluetooth e-paper dashboard for
-  `NRF_EPD_8042` hardware.
+- a native macOS menu bar app with medium and large WidgetKit widgets.
+- an optional ChatGPT appearance integration managed from the Monitor menu.
 
 ![macOS menu](docs/images/usage-popover.png)
-
-![e-paper frame](docs/images/epd-live-preview.png)
 
 ## What is included
 
@@ -19,12 +16,24 @@ the Mac, with these surfaces:
 |---|---|---|
 | macOS menu | locally launched `codex app-server` | every minute |
 | macOS widgets | sanitized App Group snapshot, with a loopback fallback for ad-hoc builds | WidgetKit timeline |
-| Bluetooth EPD | frame rendered by the macOS app | hourly check, forced after midnight |
+| ChatGPT appearance | Monitor's sanitized local quota snapshot; an included Badge helper injects the appearance | Monitor-managed helper polls the local snapshot about every 5 seconds |
+| Global reset history and forecast | public community records and forecast from [codex-reset.com](https://codex-reset.com/) | about every 5 minutes while the app is running; manual refresh is available |
 
-The EPD connection is intentionally short lived. Codex Monitor hashes the
-rendered content, skips Bluetooth entirely when the visible data is unchanged,
-and otherwise performs `connect → send → disconnect`. A failed connection or
-write is retried once.
+The daily Token chart marks confirmed global resets on the local calendar date.
+Each marker opens Tibo's original post. It reflects a community-recorded event,
+not confirmation that an individual account received a reset. Below the chart,
+the app shows the source's raw 24-hour and 48-hour global-reset probabilities,
+along with confidence and source update time. It does not show 12-hour or
+36-hour probabilities. Forecast percentages are hidden when the source data is
+over 30 minutes old or a source check fails; cached reset history remains visible.
+
+The appearance integration packages jaykinhoo9's open-source Codex Usage Badge
+with Mintzz's folder-color inheritance, Recent thread mapping, Token shades,
+Work layout, and reset-time customizations. Install, update, and repair it from
+Codex Monitor; no separate Badge installation is required. The full fork source
+is preserved in [`ThirdParty/codex-usage-badge`](ThirdParty/codex-usage-badge).
+The managed helper reads Monitor's local loopback snapshot and does not start a
+second quota collector. See [NOTICE.md](NOTICE.md).
 
 ## Quick start
 
@@ -39,15 +48,6 @@ write is retried once.
 Community DMGs are ad-hoc signed unless a maintainer supplies Apple signing and
 notarization credentials. If Gatekeeper blocks the first launch, right-click the
 app and choose **Open**, or build it from source.
-
-### Bluetooth e-paper dashboard
-
-Power an `NRF_EPD_8042` 4.2-inch 400 × 300 black/white/red display and keep it
-within Bluetooth range of the Mac. Grant Bluetooth permission to Codex Monitor.
-The app can discover the board automatically; **Probe** is available for a
-read-only hardware check, and **Sync now** forces an immediate data check.
-
-See [EPD hardware and protocol guide](docs/setup-epd.md).
 
 ## Build from source
 
@@ -85,13 +85,14 @@ uses `account/read`, `account/rateLimits/read`, and `account/usage/read`.
 Authentication and refresh-token handling remain inside Codex. The app does
 not read browser cookies or copy Codex credentials.
 
-No analytics, advertising SDK, cloud database, or developer-operated backend is
-included. See [architecture and privacy](docs/architecture-and-privacy.md).
+No analytics, advertising SDK, cloud database, or Codex Monitor-operated backend
+is included. Reset history and forecasts come from unauthenticated public JSON
+requests to codex-reset.com. Those requests do not include account details,
+Codex credentials, or quota usage. See [architecture and privacy](docs/architecture-and-privacy.md).
 
 ## Reproduction map
 
 - [macOS app and widgets](docs/setup-macos.md)
-- [Bluetooth EPD dashboard](docs/setup-epd.md)
 - [architecture, data flow, and privacy](docs/architecture-and-privacy.md)
 - [release process](docs/releasing.md)
 - [contributing](CONTRIBUTING.md)
@@ -104,6 +105,5 @@ MIT licensed. This project is derived from
 original copyright notice and MIT terms are preserved in [LICENSE](LICENSE),
 with additional attribution in [NOTICE.md](NOTICE.md).
 
-Codex, ChatGPT, OpenAI, Apple, iPhone, and the referenced display hardware are
-trademarks of their respective owners. This community project is not affiliated
-with or endorsed by OpenAI, Apple, or the hardware vendor.
+Codex, ChatGPT, OpenAI, and Apple are trademarks of their respective owners.
+This community project is not affiliated with or endorsed by OpenAI or Apple.

@@ -67,5 +67,4 @@ If a Codex response shape changes:
 - run the live integration check when possible
 
 Never commit provisioning profiles, Apple Team IDs, or personal bundle
-identifiers. For EPD changes, include a deterministic plane/orientation check
-and state the exact hardware model used for physical verification.
+identifiers.

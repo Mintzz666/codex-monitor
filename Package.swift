@@ -37,7 +37,8 @@ let package = Package(
     .executableTarget(
       name: "CodexUsageVerifier",
       dependencies: ["CodexUsageCore", "CodexUsageShared"],
-      path: "Tests/CodexUsageVerifier"
+      path: "Tests/CodexUsageVerifier",
+      swiftSettings: [.unsafeFlags(["-parse-as-library"])]
     ),
   ],
   swiftLanguageModes: [.v5]

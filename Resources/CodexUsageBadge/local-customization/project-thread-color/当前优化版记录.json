@@ -1,0 +1,26 @@
+{
+  "recorded_at": "2026-10-04",
+  "product": "Codex Usage Badge",
+  "upstream_release": "0.9.1",
+  "build_id": "mintzz-optimized-gpt-folder-sync-sg-sin",
+  "canonical_file": "agent-folder-color.cjs",
+  "sha256": "d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db",
+  "active_file": "../agent.cjs",
+  "features": [
+    "Conversation markers inherit the exact containing project-folder color in ChatGPT and Codex views.",
+    "Recent duplicate conversations inherit the folder color through their shared local thread ID when the association is unique.",
+    "Five Token-usage shades remain visible across light and dark themes.",
+    "ChatGPT Work conversation markers stay inline with titles.",
+    "Quota and reset-card times use Asia/Singapore and display the suffix SIN."
+  ],
+  "default_restore_command": "恢复优化版.command",
+  "manual_launch_command": "启动ChatGPT并加载外观.command",
+  "rollback_before_this_fix": "回退到GPT文件夹映射修复前.command",
+  "rollback_before_this_fix_sha256": "9ade7f6e7388c4408551fcf843ecb9a8691e8223ba9334619a5148071cc549c6",
+  "upstream_fallback": {
+    "file": "backup-v0.9.1/agent.cjs",
+    "sha256": "7b659e1d63b3f2bd669a951fa1ce15ad959939c7344ec3a5c330ddc80fd784de"
+  },
+  "restore_policy": "After plugin updates, restore this pinned optimized build. Use the previous optimized build only for rollback, and use upstream only when the user explicitly requests it.",
+  "cleanup_note": "Obsolete pre-SIN rollback artifacts were moved to macOS Trash on 2026-10-04; the pinned build, immediate optimized rollback, and upstream fallback are retained."
+}

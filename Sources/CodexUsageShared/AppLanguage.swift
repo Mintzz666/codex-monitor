@@ -150,6 +150,42 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     return format(date, dateFormat: "HH:mm:ss")
   }
 
+  public func menuDateText(_ date: Date) -> String {
+    format(date, dateFormat: self == .simplifiedChinese ? "M月d日 EEEE" : "EEE, MMM d")
+  }
+
+  public func tokenDateLabel(_ day: String) -> String {
+    formatTokenDay(day, dateFormat: "M/d")
+  }
+
+  public func tokenWeekdayLabel(_ day: String) -> String {
+    formatTokenDay(day, dateFormat: "EEE")
+  }
+
+  public func tokenFullDateLabel(_ day: String) -> String {
+    formatTokenDay(
+      day,
+      dateFormat: self == .simplifiedChinese ? "M月d日 EEEE" : "EEEE, MMMM d"
+    )
+  }
+
+  private func formatTokenDay(_ day: String, dateFormat: String) -> String {
+    // A bucket key represents a calendar day, not an instant to shift between
+    // time zones. Parse and display it in the same fixed Gregorian calendar.
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.isLenient = false
+    guard let date = formatter.date(from: day), formatter.string(from: date) == day else {
+      return day
+    }
+    formatter.locale = locale
+    formatter.dateFormat = dateFormat
+    return formatter.string(from: date)
+  }
+
   public func localizedErrorMessage(_ message: String) -> String {
     guard self == .english else {
       return message

@@ -5,10 +5,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL_DIRECTORY="${INSTALL_DIRECTORY:-/Applications}"
 INSTALLED_APP="$INSTALL_DIRECTORY/Codex Monitor.app"
 BUILT_APP="$ROOT/dist/Codex Monitor.app"
-BACKUP_APP="$ROOT/dist/backups/$(date +%Y%m%d-%H%M%S)/Codex Monitor.app"
+BACKUP_ARCHIVE="$ROOT/dist/backups/$(date +%Y%m%d-%H%M%S)/Codex Monitor.zip"
 
-# Keep the app identity, desktop widget registration, preferences, and remembered
-# Bluetooth device when updating an existing local installation.
+# Keep the app identity, desktop widget registration, and preferences when
+# updating an existing local installation.
 if [[ -d "$INSTALLED_APP" ]]; then
   export APP_BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INSTALLED_APP/Contents/Info.plist")"
   export APP_GROUP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :CodexUsageAppGroupIdentifier' "$INSTALLED_APP/Contents/Info.plist")"
@@ -21,12 +21,13 @@ codesign --verify --deep --strict "$BUILT_APP"
 mkdir -p "$INSTALL_DIRECTORY"
 STAGING_DIRECTORY="$(mktemp -d "$INSTALL_DIRECTORY/.codex-monitor-install.XXXXXX")"
 trap 'rm -rf "$STAGING_DIRECTORY"' EXIT
-ditto "$BUILT_APP" "$STAGING_DIRECTORY/Codex Monitor.app"
+mv "$BUILT_APP" "$STAGING_DIRECTORY/Codex Monitor.app"
 codesign --verify --deep --strict "$STAGING_DIRECTORY/Codex Monitor.app"
 
 if [[ -d "$INSTALLED_APP" ]]; then
-  mkdir -p "$(dirname "$BACKUP_APP")"
-  ditto "$INSTALLED_APP" "$BACKUP_APP"
+  mkdir -p "$(dirname "$BACKUP_ARCHIVE")"
+  ditto -c -k --sequesterRsrc --keepParent "$INSTALLED_APP" "$BACKUP_ARCHIVE"
+  unzip -tqq "$BACKUP_ARCHIVE"
 fi
 
 if pgrep -x 'Codex Monitor' >/dev/null; then
@@ -53,6 +54,6 @@ if ! mv "$STAGING_DIRECTORY/Codex Monitor.app" "$INSTALLED_APP"; then
 fi
 open "$INSTALLED_APP"
 printf 'Installed: %s\n' "$INSTALLED_APP"
-if [[ -d "$BACKUP_APP" ]]; then
-  printf 'Previous version: %s\n' "$BACKUP_APP"
+if [[ -f "$BACKUP_ARCHIVE" ]]; then
+  printf 'Previous version: %s\n' "$BACKUP_ARCHIVE"
 fi
