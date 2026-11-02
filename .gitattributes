@@ -1,0 +1,4 @@
+# Preserve upstream sources while keeping language statistics focused on Monitor.
+ThirdParty/** linguist-vendored
+# Pinned, bundled third-party runtime; customized source provenance is in NOTICE.
+Resources/CodexUsageBadge/** linguist-vendored
