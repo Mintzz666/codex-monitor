@@ -1,0 +1,47 @@
+name: Test and audit
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install chromium --only-shell
+      - run: python scripts/build_release.py
+      - run: npm test
+      - name: macOS native startup helper
+        if: runner.os == 'macOS'
+        run: node tests/startup-native.cjs .devtools/macos-startup-bridge
+      - name: PowerShell portability and rollback tests
+        shell: pwsh
+        run: ./tests/windows.ps1
+      - name: Native Windows install and shutdown
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/windows-native.ps1
+      - name: Windows update archive validation
+        shell: pwsh
+        run: ./tests/windows-update.ps1
+      - name: Native Windows startup adapter
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/windows-startup-native.ps1
+      - run: python scripts/audit_release.py
