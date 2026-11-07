@@ -7,15 +7,21 @@ import SwiftUI
 @main
 struct CodexUsageBarApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+  @AppStorage(AppLanguage.storageKey)
+  private var storedLanguage = AppLanguage.systemDefault.rawValue
 
   var body: some Scene {
     Settings {
       BadgeIntegrationSettingsView(model: appDelegate.badgeIntegrationModel)
     }
-    Window("ChatGPT 外观增强", id: "badge-integration") {
+    Window(
+      AppLanguage.resolve(storedLanguage) == .simplifiedChinese
+        ? "ChatGPT 外观增强" : "ChatGPT Appearance",
+      id: "badge-integration"
+    ) {
       BadgeIntegrationSettingsView(model: appDelegate.badgeIntegrationModel)
     }
-    .defaultSize(width: 520, height: 390)
+    .defaultSize(width: 520, height: 430)
     .windowResizability(.contentSize)
   }
 }

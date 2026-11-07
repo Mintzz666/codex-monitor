@@ -14,6 +14,7 @@ function healthyFixture(overrides = {}) {
     badgeManagerHashValid: true,
     badgeActiveFilesValid: true,
     badgeAgentRunning: true,
+    badgeStartupAgentRunning: true,
     chatGPTInstalled: true,
     cdpReachable: true,
     mainWindowCount: 1,
@@ -42,6 +43,11 @@ test('an unavailable ChatGPT debug port is classified separately', () => {
   const result = assessHealth(healthyFixture({ cdpReachable: false, mainWindowCount: 0, injectedWindowCount: 0 }));
   assert.ok(result.errors.includes('chatgpt_debug_port_unreachable'));
   assert.ok(!result.errors.includes('badge_ui_not_confirmed'));
+});
+
+test('a stopped startup watcher is detected even when the injection agent is running', () => {
+  const result = assessHealth(healthyFixture({ badgeStartupAgentRunning: false }));
+  assert.deepEqual(result.errors, ['badge_startup_agent_not_running']);
 });
 
 test('a connected debug port without verified modules is not accepted as injection', () => {

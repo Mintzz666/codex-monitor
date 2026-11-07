@@ -18,7 +18,8 @@ const execFileSync=(bin,args,options)=>{
       assert.ok(fs.existsSync(args[2]));jobs.add(job);
       if(job==='com.codexusagebadge.startup'){
         const receipt=path.join(installDir,'startup-helper/state.json');let old={};try{old=JSON.parse(fs.readFileSync(receipt,'utf8'));}catch{}
-        fs.writeFileSync(receipt,JSON.stringify({...old,event:'watching',updatedAt:Date.now()}));
+        // Recovery/skip may replace the initial event before the installer polls.
+        fs.writeFileSync(receipt,JSON.stringify({...old,event:'skipped-active-or-background',watchingAt:Date.now(),updatedAt:Date.now()}));
       }
       return '';
     }

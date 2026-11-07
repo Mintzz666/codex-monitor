@@ -198,9 +198,10 @@ struct CodexUsageVerifier {
       "实时共享 quota metadata 与当前 credential 指纹一致"
     )
 
-    let quotaObject = snapshot.rateLimitsJSON.flatMap { json in
-      try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
-    } ?? [:]
+    let quotaObject =
+      snapshot.rateLimitsJSON.flatMap { json in
+        try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+      } ?? [:]
     let rateLimitEntries: [(String, [String: Any])] = {
       var entries: [(String, [String: Any])] = []
       if let defaultLimit = quotaObject["rateLimits"] as? [String: Any] {
@@ -223,7 +224,8 @@ struct CodexUsageVerifier {
         else {
           return false
         }
-        let duration = window["windowDurationMins"] as? Int
+        let duration =
+          window["windowDurationMins"] as? Int
           ?? (window["windowDurationSeconds"] as? Int).map { ($0 + 59) / 60 }
         return duration.map { (8_640...11_520).contains($0) } ?? false
       }
@@ -235,9 +237,10 @@ struct CodexUsageVerifier {
       "实时 rateLimitsJSON 可解析、已脱敏且包含 Codex 周窗口"
     )
 
-    let hasTokenUsage = snapshot.tokenUsage.map {
-      $0.lifetimeTokens != nil || !$0.dailyBuckets.isEmpty
-    } ?? false
+    let hasTokenUsage =
+      snapshot.tokenUsage.map {
+        $0.lifetimeTokens != nil || !$0.dailyBuckets.isEmpty
+      } ?? false
     try expect((0...100).contains(snapshot.usedPercent), "实时使用率范围")
     try expect(snapshot.windowDurationMinutes == 10_080, "实时周窗口长度")
     print(
@@ -410,6 +413,25 @@ struct CodexUsageVerifier {
   }
 
   private static func verifyAppLanguage() throws {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let countdownCases: [(TimeInterval?, String?, String?)] = [
+      (nil, nil, nil),
+      (-1, "等待重置", "Awaiting reset"),
+      (0, "等待重置", "Awaiting reset"),
+      (3_599, "还剩不到 1 小时", "Less than 1h remaining"),
+      (3_600, "还剩 1 小时", "1h remaining"),
+      (86_400, "还剩 1 天 0 小时", "1d 0h remaining"),
+      (169_200, "还剩 1 天 23 小时", "1d 23h remaining"),
+    ]
+    for (index, item) in countdownCases.enumerated() {
+      let date = item.0.map { now.addingTimeInterval($0) }
+      try expect(
+        AppLanguage.simplifiedChinese.resetCountdownText(date, now: now) == item.1
+          && AppLanguage.english.resetCountdownText(date, now: now) == item.2,
+        "重置倒计时中英文边界 \(index + 1)"
+      )
+    }
+
     let defaultsSuite = "CodexUsageVerifier.\(UUID().uuidString)"
     guard let defaults = UserDefaults(suiteName: defaultsSuite) else {
       throw VerificationFailure("创建语言偏好测试存储")
@@ -662,20 +684,29 @@ enum ResetRadarChecks {
       "RESET 按本机时区归日，避免把 UTC 17 日错误标到北京时间 17 日"
     )
 
-    func forecast(_ first: Double, _ second: Double, at: String = "2026-10-21T07:59:00.000Z") throws -> Data {
+    func forecast(_ first: Double, _ second: Double, at: String = "2026-10-21T07:59:00.000Z") throws
+      -> Data
+    {
       try JSONSerialization.data(withJSONObject: [
         "updated_at": at, "confidence": "low",
         "probabilities": ["rounded_24h": first, "rounded_48h": second],
       ])
     }
     let fresh = try ResetRadarParser.parseForecast(forecast(22, 39), now: now)
-    try check(fresh.percent24h == 22 && fresh.percent48h == 39 && fresh.isFresh(at: now), "展示源站 24h/48h 数值和源更新时间")
-    let stale = try ResetRadarParser.parseForecast(forecast(22, 39, at: "2026-10-21T07:00:00Z"), now: now)
+    try check(
+      fresh.percent24h == 22 && fresh.percent48h == 39 && fresh.isFresh(at: now),
+      "展示源站 24h/48h 数值和源更新时间")
+    let stale = try ResetRadarParser.parseForecast(
+      forecast(22, 39, at: "2026-10-21T07:00:00Z"), now: now)
     try check(!stale.isFresh(at: now), "超过 30 分钟的预测不能作为当前预测")
-    for data in [try forecast(101, 110), try forecast(60, 20), try forecast(22, 39, at: "2026-10-21T09:00:00Z")] {
+    for data in [
+      try forecast(101, 110), try forecast(60, 20),
+      try forecast(22, 39, at: "2026-10-21T09:00:00Z"),
+    ] {
       do {
         _ = try ResetRadarParser.parseForecast(data, now: now)
-        throw NSError(domain: "ResetRadarChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: "接受了无效预测"])
+        throw NSError(
+          domain: "ResetRadarChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: "接受了无效预测"])
       } catch ResetRadarError.invalidResponse {
         // Expected: malformed/future probabilities do not replace the cache.
       }
@@ -687,12 +718,15 @@ enum ResetRadarChecks {
     let snapshot = try await ResetRadarClient().fetch()
     try check(snapshot.forecast.isFresh(), "实时社区预测来源新鲜")
     try check(!snapshot.events.isEmpty, "实时读取已确认历史并保留原帖链接")
-    print("PASS Reset source: 24h=\(snapshot.forecast.percent24h)%, 48h=\(snapshot.forecast.percent48h)%; dates=\(snapshot.events.prefix(3).map { $0.dateKey() })")
+    print(
+      "PASS Reset source: 24h=\(snapshot.forecast.percent24h)%, 48h=\(snapshot.forecast.percent48h)%; dates=\(snapshot.events.prefix(3).map { $0.dateKey() })"
+    )
   }
 
   private static func check(_ value: Bool, _ message: String) throws {
     guard value else {
-      throw NSError(domain: "ResetRadarChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+      throw NSError(
+        domain: "ResetRadarChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
     print("PASS \(message)")
   }

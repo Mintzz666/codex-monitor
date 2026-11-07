@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import os
 import sys
 from pathlib import Path
 
@@ -16,6 +17,7 @@ IGNORED_PARTS = {
     "dist",
     "node_modules",
     "xcuserdata",
+    "__pycache__",
 }
 REQUIRED_PATHS = {
     ".github/workflows/ci.yml",
@@ -28,6 +30,7 @@ REQUIRED_PATHS = {
     "README.zh-CN.md",
     "SECURITY.md",
     "Scripts/package.sh",
+    "Scripts/version.sh",
     "Scripts/release_package.sh",
     "docs/architecture-and-privacy.md",
     "docs/images/usage-popover.png",
@@ -70,18 +73,28 @@ FORBIDDEN_PATTERNS = {
 def iter_public_files() -> list[Path]:
     files: list[Path] = []
     this_script = Path(__file__).resolve()
-    for path in ROOT.rglob("*"):
-        if not path.is_file() or path.resolve() == this_script:
-            continue
-        relative = path.relative_to(ROOT)
-        if any(part in IGNORED_PARTS for part in relative.parts):
-            continue
-        files.append(path)
+    for directory, directories, names in os.walk(ROOT):
+        directories[:] = [name for name in directories if name not in IGNORED_PARTS]
+        for name in names:
+            path = Path(directory) / name
+            if name not in IGNORED_PARTS and path.is_file() and path.resolve() != this_script:
+                files.append(path)
     return files
 
 
 def main() -> int:
     failures: list[str] = []
+
+    spec = (ROOT / "project.yml").read_text()
+    version = re.search(r"MARKETING_VERSION:\s*(\S+)", spec).group(1)
+    build = re.search(r"CURRENT_PROJECT_VERSION:\s*(\S+)", spec).group(1)
+    project = (ROOT / "CodexUsageBar.xcodeproj/project.pbxproj").read_text()
+    for key, expected in [("MARKETING_VERSION", version), ("CURRENT_PROJECT_VERSION", build)]:
+        values = re.findall(rf"{key}\s*=\s*([^;\s]+);", project)
+        if not values or any(value != expected for value in values):
+            failures.append(f"Xcode {key} is out of sync with project.yml")
+    if not (ROOT / f"docs/release-notes/v{version}.md").is_file():
+        failures.append("missing release notes for the current version")
 
     for relative_path in sorted(REQUIRED_PATHS):
         if not (ROOT / relative_path).is_file():

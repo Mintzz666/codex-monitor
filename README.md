@@ -29,6 +29,15 @@ one place. No separate Badge installation is required.
 <p align="center"><img src="docs/images/usage-popover-en.png" width="344" alt="Codex Monitor English menu preview with example usage values" /></p>
 <p align="center"><sub>Preview with example usage values. The app supports English and Simplified Chinese.</sub></p>
 
+## New in 1.5
+
+- Reset countdown in English and Simplified Chinese.
+- Login recovery for untouched restored windows, with focus protection.
+- Visible startup-helper health, short-lived status caching and bounded checks.
+- Runtime-only packaging, a smaller shared-quota entry point and rollback-safe updates.
+
+See the [1.5.0 release notes](docs/release-notes/v1.5.0.md) for validation and limits.
+
 ## Sidebar colors that stay with your projects
 
 Assign one of seven colors to a project folder. Its conversations inherit that
@@ -53,9 +62,12 @@ signed. If macOS blocks the first launch, use its **Open** / **Open Anyway**
 flow or build from source. Windows is a future port; the upstream Windows
 reference files do not constitute a Windows Monitor release.
 
-Monitor remembers your launch-at-login preference. If ChatGPT’s local interface
-is disconnected, fully quit ChatGPT with ⌘Q and reopen it from its usual icon.
-Monitor does not close ChatGPT for you.
+Monitor remembers your launch-at-login preference. Install the appearance helper
+once; its login watcher handles clients restored before the watcher and unused
+launches up to one minute old. It may gracefully reopen a new, untouched client
+to load the appearance; background restoration stays hidden. Clients already in
+use are skipped. If the local interface is still disconnected, fully quit
+ChatGPT with ⌘Q and reopen it from its usual icon; no reinstall is needed.
 
 ## What runs locally
 

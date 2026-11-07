@@ -137,7 +137,9 @@ async function install() {
       await pause(200);
       try {
         const state=JSON.parse(fs.readFileSync(path.join(startupDir,'state.json'),'utf8'));
-        ready=state.event==='watching'&&state.updatedAt>=startedAt&&/state = running/.test(loaded(startupLabel)||'');
+        // The initial snapshot can immediately recover or skip a client. Keep
+        // readiness independent of the most recent lifecycle event.
+        ready=state.watchingAt>=startedAt&&state.updatedAt>=startedAt&&/state = running/.test(loaded(startupLabel)||'');
       } catch {}
       if(ready)break;
     }

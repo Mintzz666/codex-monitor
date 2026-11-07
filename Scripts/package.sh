@@ -3,8 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex Monitor"
-VERSION="${VERSION:-1.4.10}"
-BUILD_NUMBER="${BUILD_NUMBER:-47}"
+source "$ROOT/Scripts/version.sh"
 APP_BUNDLE_IDENTIFIER="${APP_BUNDLE_IDENTIFIER:-com.example.codexmonitor}"
 APP_GROUP_IDENTIFIER="${APP_GROUP_IDENTIFIER:-group.com.example.codexmonitor}"
 WIDGET_BUNDLE_IDENTIFIER="${WIDGET_BUNDLE_IDENTIFIER:-com.example.codexmonitor.widget}"
@@ -20,6 +19,11 @@ BADGE_RESOURCES="$ROOT/Resources/CodexUsageBadge"
 PINNED_BADGE_SHA256="d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db"
 
 cd "$ROOT"
+
+# Use a full Xcode SDK without changing the machine's xcode-select setting.
+if [[ -z "${DEVELOPER_DIR:-}" && -d /Applications/Xcode.app/Contents/Developer ]]; then
+  export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+fi
 
 if ! xcodebuild -version >/dev/null 2>&1; then
   printf '%s\n' \
@@ -84,7 +88,7 @@ if [[ "$ACTUAL_BADGE_SHA256" != "$PINNED_BADGE_SHA256" ]]; then
 fi
 
 # Optional local artwork is not part of the public source distribution.
-if [[ -f "$ROOT/Resources/OfficialCodexMenuTemplate.png" ]]; then
+if [[ "${INCLUDE_LOCAL_MENU_ICON:-0}" == "1" && -f "$ROOT/Resources/OfficialCodexMenuTemplate.png" ]]; then
   cp "$ROOT/Resources/OfficialCodexMenuTemplate.png" "$APP_DIR/Contents/Resources/"
 fi
 

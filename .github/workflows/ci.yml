@@ -22,7 +22,10 @@ jobs:
           node-version: 24
 
       - name: Read package version
-        run: echo "VERSION=$(awk '/MARKETING_VERSION:/{print $2; exit}' project.yml)" >> "$GITHUB_ENV"
+        run: |
+          source Scripts/version.sh
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -47,23 +50,7 @@ jobs:
         run: make widget-build
 
       - name: Package local macOS app and DMG
-        env:
-          BUILD_NUMBER: ${{ github.run_number }}
         run: make release-package
 
       - name: Verify artifacts
-        run: |
-          APP="dist/Codex Monitor.app"
-          WIDGET="$APP/Contents/PlugIns/CodexMonitorWidget.appex"
-          DMG="dist/Codex-Monitor-v${VERSION}-universal.dmg"
-          test -d "$APP"
-          test -d "$WIDGET"
-          test -f "$DMG"
-          test -f "$DMG.sha256"
-          plutil -lint "$APP/Contents/Info.plist"
-          plutil -lint "$WIDGET/Contents/Info.plist"
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          (
-            cd dist
-            shasum -a 256 -c "$(basename "$DMG").sha256"
-          )
+        run: python3 Scripts/verify_release_artifact.py

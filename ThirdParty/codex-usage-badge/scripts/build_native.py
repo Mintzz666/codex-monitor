@@ -8,7 +8,9 @@ if platform.system() != 'Darwin':
     raise SystemExit('Build the macOS helper on macOS with Xcode Command Line Tools.')
 dest = root / '.devtools/macos-startup-bridge'
 dest.parent.mkdir(exist_ok=True)
+sdk = subprocess.check_output(['/usr/bin/xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
 subprocess.run(['/usr/bin/xcrun', 'clang', '-fobjc-arc', '-O2', '-Wall', '-Wextra', '-Werror',
+                '-isysroot', sdk,
                 '-arch', 'arm64', '-arch', 'x86_64', '-mmacosx-version-min=12.0',
                 '-framework', 'AppKit', '-framework', 'ApplicationServices',
                 'macos/startup/bridge.m', '-o', str(dest)], cwd=root, check=True)

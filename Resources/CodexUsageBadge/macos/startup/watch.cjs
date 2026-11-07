@@ -38,7 +38,7 @@ const adapter={
     console.log(new Date().toISOString(),event);
   }
 };
-const controller=new StartupController(adapter,{lastAttemptAt:state.lastAttemptAt||0});
+const controller=new StartupController(adapter,{lastAttemptAt:state.lastAttemptAt||0,lastAttemptInputStamp:state.lastAttemptInputStamp||null});
 let stopped=false,queued=false,pumping=false,pendingTimer;
 async function pump() {
   queued=true;

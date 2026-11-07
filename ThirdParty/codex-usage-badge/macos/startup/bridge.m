@@ -136,7 +136,10 @@ int main(int argc, const char *argv[]) { @autoreleasepool {
         double age = a.launchDate ? (NSDate.date.timeIntervalSince1970-a.launchDate.timeIntervalSince1970)*1000 : INFINITY;
         NSDictionary *args = a ? argumentsState(a.processIdentifier) : @{};
         // Recheck all guards at the native action boundary. No forceTerminate, kill or app activation.
-        BOOL safe = matches(a,path) && a.finishedLaunching && [identity(a) isEqualToString:@(argv[4])] && age>=0 && age<=8000 && inputIdleMs()>=age && [inputStamp() isEqualToString:@(argv[5])] && NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier==a.processIdentifier && [args[@"known"] boolValue] && args[@"port"]==NSNull.null;
+        // Login-restored clients can precede the watcher and remain in the
+        // background. Only an unused, freshly launched process is eligible;
+        // preserve the same guards here as in the controller.
+        BOOL safe = matches(a,path) && a.finishedLaunching && [identity(a) isEqualToString:@(argv[4])] && age>=0 && age<=60000 && inputIdleMs()>=age && [inputStamp() isEqualToString:@(argv[5])] && [args[@"known"] boolValue] && args[@"port"]==NSNull.null;
         output(@{@"accepted":(safe && [a terminate]) ? @YES : @NO}); return 0;
     }
     if ([action isEqualToString:@"launch"] && argc==5) {

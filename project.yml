@@ -10,10 +10,10 @@ settings:
   base:
     APP_BUNDLE_IDENTIFIER: com.example.codexmonitor
     APP_GROUP_IDENTIFIER: group.com.example.codexmonitor
-    CURRENT_PROJECT_VERSION: 47
+    CURRENT_PROJECT_VERSION: 50
     DEVELOPMENT_LANGUAGE: zh_CN
     ENABLE_HARDENED_RUNTIME: YES
-    MARKETING_VERSION: 1.4.10
+    MARKETING_VERSION: 1.5.0
     SWIFT_VERSION: 5.0
     WIDGET_BUNDLE_IDENTIFIER: com.example.codexmonitor.widget
 

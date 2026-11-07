@@ -176,13 +176,26 @@ struct UsageMenuView: View {
   }
 
   private var detailsSection: some View {
-    HStack(spacing: 8) {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
       Label(nextResetText, systemImage: "arrow.clockwise")
         .foregroundStyle(.secondary)
       Spacer()
-      Text(viewModel.resetDisplayText(for: language))
-        .fontWeight(.medium)
+      TimelineView(.periodic(from: .now, by: 60)) { context in
+        VStack(alignment: .trailing, spacing: 3) {
+          Text(viewModel.resetDisplayText(for: language))
+            .fontWeight(.medium)
+          if let countdown = language.resetCountdownText(
+            viewModel.snapshot?.resetsAt,
+            now: context.date
+          ) {
+            Text(countdown)
+              .font(.caption2)
+              .foregroundStyle(.secondary)
+          }
+        }
         .monospacedDigit()
+        .accessibilityElement(children: .combine)
+      }
     }
     .font(.caption)
   }
@@ -300,7 +313,9 @@ struct UsageMenuView: View {
                 }
                 .buttonStyle(.plain)
                 .help(resetHelp(event))
-                .accessibilityLabel("RESET · \(language.tokenFullDateLabel(point.bucket.startDate))")
+                .accessibilityLabel(
+                  "RESET · \(language.tokenFullDateLabel(point.bucket.startDate))"
+                )
                 .position(
                   x: geometry[proxy.plotAreaFrame].minX + x,
                   y: geometry[proxy.plotAreaFrame].maxY + 38
@@ -354,7 +369,8 @@ struct UsageMenuView: View {
     guard let first = menuTokenPoints.first, let last = menuTokenPoints.last else {
       return language == .simplifiedChinese ? "每日用量" : "Daily usage"
     }
-    let range = "\(language.tokenDateLabel(first.bucket.startDate))–"
+    let range =
+      "\(language.tokenDateLabel(first.bucket.startDate))–"
       + language.tokenDateLabel(last.bucket.startDate)
     return range + (language == .simplifiedChinese ? " · 每日用量" : " · Daily usage")
   }
@@ -393,7 +409,8 @@ struct UsageMenuView: View {
   }
 
   private func resetHelp(_ event: GlobalResetEvent) -> String {
-    let description = language == .simplifiedChinese
+    let description =
+      language == .simplifiedChinese
       ? "Tibo 全局重置完成记录（社区收录）"
       : "Tibo global reset confirmation (community archive)"
     return description + "\n" + language.resetDisplayText(event.confirmedAt)
@@ -623,8 +640,14 @@ private struct AppearanceIntegrationRow: View {
       .padding(.vertical, 3)
     }
     .buttonStyle(.plain)
-    .help(language == .simplifiedChinese ? "查看连接状态并管理外观增强" : "Check connection and manage the appearance add-on")
-    .accessibilityLabel(language == .simplifiedChinese ? "ChatGPT 外观增强，\(model.summary(for: language))" : "ChatGPT appearance, \(model.summary(for: language))")
+    .help(
+      language == .simplifiedChinese
+        ? "查看连接状态并管理外观增强" : "Check connection and manage the appearance add-on"
+    )
+    .accessibilityLabel(
+      language == .simplifiedChinese
+        ? "ChatGPT 外观增强，\(model.summary(for: language))"
+        : "ChatGPT appearance, \(model.summary(for: language))")
   }
 }
 

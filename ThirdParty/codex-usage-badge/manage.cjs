@@ -157,7 +157,7 @@ async function installUnlocked() {
       await pause(200);
       try {
         const state=JSON.parse(fs.readFileSync(path.join(startupDir,'state.json'),'utf8'));
-        ready=state.event==='watching'&&state.updatedAt>=startedAt&&/state = running/.test(loaded(startupLabel)||'')&&/state = running/.test(loaded(label)||'');
+        ready=state.watchingAt>=startedAt&&state.updatedAt>=startedAt&&/state = running/.test(loaded(startupLabel)||'')&&/state = running/.test(loaded(label)||'');
       } catch {}
       if(ready)break;
     }

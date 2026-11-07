@@ -25,6 +25,7 @@ git clone https://github.com/Mintzz666/codex-monitor.git
 cd codex-monitor
 
 make test
+make badge-test
 ```
 
 `make test` uses deterministic fixtures and does not require account data. The
@@ -89,7 +90,11 @@ then Run. The built product is `Codex Monitor.app`.
 
 For a local update, run `make install`. It preserves the identifiers of the app
 already in `/Applications`, saves a rollback copy under `dist/backups/`, then
-replaces and opens the application.
+verifies the staged and installed signatures, then replaces and opens the
+application in the background. A failed replacement, signature check or launch
+restores the previous application. `SKIP_BUILD=1 BUILT_APP_PATH=... make install`
+can install an already verified build; it refuses different app/widget/App Group
+identities before stopping Monitor.
 Use `BUILD_ARCHS="$(uname -m)" make install` for a faster build for this Mac only.
 Full Xcode is still required.
 
@@ -100,6 +105,11 @@ Full Xcode is still required.
    **Codex Monitor**, and add a medium or large widget.
 4. The application registers launch at login by default. It can be disabled in
    the menu panel.
+
+The reset label includes a countdown that updates once per minute while the
+menu is open. The appearance panel checks the injection agent and login watcher
+separately. Successful status checks are reused for 30 seconds (5 seconds when
+attention is needed); **Check now** bypasses that cache.
 
 The menu refreshes once per minute, checks stale data after wake, and supports
 manual refresh with Command-R. The panel height adapts to its contents and stays

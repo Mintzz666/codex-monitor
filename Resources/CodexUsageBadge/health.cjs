@@ -160,6 +160,7 @@ function assessHealth(data) {
   if (!data.badgeManagerHashValid || !data.badgeActiveFilesValid) errors.push('active_manager_or_files_mismatch');
   if (!data.quotaSnapshotFresh) errors.push('quota_snapshot_unavailable_or_stale');
   if (!data.badgeAgentRunning) errors.push('badge_agent_not_running');
+  if (!data.badgeStartupAgentRunning) errors.push('badge_startup_agent_not_running');
   if (!data.chatGPTInstalled) errors.push('chatgpt_app_missing');
   if (!data.cdpReachable) errors.push('chatgpt_debug_port_unreachable');
   else if (data.mainWindowCount === 0) errors.push('chatgpt_main_window_unavailable');
@@ -199,6 +200,7 @@ async function collectHealth() {
   const bundleHashValid = badgeBundleHashValid;
   const activeHashValid = activeHash === EXPECTED_BADGE_SHA256;
   const badgeAgentRunning = launchAgentRunning('com.codexusagebadge.agent');
+  const badgeStartupAgentRunning = launchAgentRunning('com.codexusagebadge.startup');
   const monitor = checkMonitor();
 
   const assessment = assessHealth({
@@ -209,6 +211,7 @@ async function collectHealth() {
     badgeManagerHashValid,
     badgeActiveFilesValid,
     badgeAgentRunning,
+    badgeStartupAgentRunning,
     chatGPTInstalled,
     cdpReachable,
     mainWindowCount: pages.length,
@@ -224,6 +227,7 @@ async function collectHealth() {
     badgeManagerHashValid,
     badgeActiveFilesValid,
     badgeAgentRunning,
+    badgeStartupAgentRunning,
     chatGPTInstalled,
     cdpReachable,
     mainWindowCount: pages.length,
@@ -245,7 +249,7 @@ function backupInstalledBadge() {
   if (!fs.existsSync(SUPPORT)) return null;
   const backupRoot = path.join(os.homedir(), 'Library/Application Support/Codex Monitor Backups');
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const destination = path.join(backupRoot, `Badge-before-1.4.9-${stamp}`);
+  const destination = path.join(backupRoot, `Badge-before-update-${stamp}`);
   fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
   const selected = [
     'agent.cjs', 'manage.cjs', 'network-agent.cjs', 'shared-quota.cjs', 'macos',

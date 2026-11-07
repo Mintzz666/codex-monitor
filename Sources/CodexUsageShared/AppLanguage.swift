@@ -143,6 +143,27 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     )
   }
 
+  public func resetCountdownText(_ date: Date?, now: Date = .now) -> String? {
+    guard let date else { return nil }
+    let remaining = date.timeIntervalSince(now)
+    guard remaining > 0 else {
+      return self == .simplifiedChinese ? "等待重置" : "Awaiting reset"
+    }
+    guard remaining >= 3_600 else {
+      return self == .simplifiedChinese ? "还剩不到 1 小时" : "Less than 1h remaining"
+    }
+
+    let totalHours = Int(remaining / 3_600)
+    let days = totalHours / 24
+    let hours = totalHours % 24
+    if days == 0 {
+      return self == .simplifiedChinese ? "还剩 \(hours) 小时" : "\(hours)h remaining"
+    }
+    return self == .simplifiedChinese
+      ? "还剩 \(days) 天 \(hours) 小时"
+      : "\(days)d \(hours)h remaining"
+  }
+
   public func lastUpdatedDisplayText(_ date: Date?) -> String {
     guard let date else {
       return text(.notRefreshed)
