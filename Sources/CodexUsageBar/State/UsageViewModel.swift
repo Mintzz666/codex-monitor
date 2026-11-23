@@ -48,6 +48,8 @@ final class UsageViewModel: ObservableObject {
   private var consecutiveRefreshFailures = 0
   private var observedAccountFingerprint = CredentialIdentity.currentFingerprint()
   private static let resetRadarStorageKey = "codex-reset-radar-v1"
+  private static let antigravityAppID = "com.google.antigravity"
+  private static let geminiAppID = "com.google.GeminiMacOS"
 
   init(
     client: CodexAppServerClient = CodexAppServerClient(),
@@ -241,10 +243,11 @@ final class UsageViewModel: ObservableObject {
   }
 
   private func refreshGeminiQuotaIfStale(force: Bool = false) async {
-    let application = NSRunningApplication.runningApplications(
-      withBundleIdentifier: "com.google.antigravity"
-    )
-    .first { !$0.isTerminated }
+    let applications = [Self.antigravityAppID, Self.geminiAppID].compactMap { identifier in
+      NSRunningApplication.runningApplications(withBundleIdentifier: identifier)
+        .first { !$0.isTerminated }
+    }
+    let application = applications.first
     if geminiTargetPID != application?.processIdentifier {
       geminiTargetPID = application?.processIdentifier
       lastGeminiQuotaAttempt = nil
@@ -256,7 +259,7 @@ final class UsageViewModel: ObservableObject {
       return
     }
     let now = Date()
-    let interval: TimeInterval = application == nil ? 115 : 45
+    let interval: TimeInterval = application?.bundleIdentifier == Self.antigravityAppID ? 45 : 115
     if !force, let lastGeminiQuotaAttempt, now.timeIntervalSince(lastGeminiQuotaAttempt) < interval
     {
       return
@@ -264,17 +267,22 @@ final class UsageViewModel: ObservableObject {
     isGeminiQuotaRefreshing = true
     lastGeminiQuotaAttempt = now
     defer { isGeminiQuotaRefreshing = false }
-    let result: GeminiQuotaSnapshot?
-    if let bundle = application?.bundleURL {
-      result = try? await antigravityQuotaClient.fetch(antigravityBundle: bundle)
-    } else if let executable = NSWorkspace.shared.urlForApplication(
-      withBundleIdentifier: "com.google.GeminiMacOS")?
-      .appendingPathComponent("Contents/Helpers/agy"),
+    var result: GeminiQuotaSnapshot?
+    for candidate in applications {
+      if let bundle = candidate.bundleURL,
+        let quota = try? await antigravityQuotaClient.fetch(antigravityBundle: bundle),
+        !candidate.isTerminated
+      {
+        result = quota
+        break
+      }
+    }
+    if result == nil,
+      let executable = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.geminiAppID)?
+        .appendingPathComponent("Contents/Helpers/agy"),
       FileManager.default.isExecutableFile(atPath: executable.path)
     {
       result = try? await antigravityQuotaClient.fetchFromCLI(executable: executable)
-    } else {
-      result = nil
     }
     guard application?.isTerminated != true, geminiTargetPID == application?.processIdentifier
     else {
