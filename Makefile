@@ -7,7 +7,7 @@ test:
 	swift run CodexUsageVerifier
 
 badge-test:
-	$${CODEX_BADGE_NODE:-node} --test Tests/codex_usage_badge_health.test.cjs Tests/codex_usage_badge_shared_quota.test.cjs Tests/codex_usage_badge_runtime.test.cjs
+	$${CODEX_BADGE_NODE:-node} --test Tests/codex_usage_badge_health.test.cjs Tests/codex_usage_badge_shared_quota.test.cjs Tests/codex_usage_badge_runtime.test.cjs Tests/codex_usage_badge_ui.test.cjs
 	STARTUP_CONTROLLER_PATH="$(CURDIR)/Resources/CodexUsageBadge/macos/startup/controller.cjs" $${CODEX_BADGE_NODE:-node} ThirdParty/codex-usage-badge/tests/startup-controller.cjs
 	python3 -m unittest discover -s Tests -p 'test_badge_packaging.py'
 	python3 -m unittest discover -s Tests -p 'test_release_install.py'

@@ -95,13 +95,42 @@ function pickCodexSnapshot(response) {
 function quotaTone(percent) {
   return !Number.isFinite(percent) ? 'muted' : percent < 10 ? 'danger' : percent <= 50 ? 'warning' : 'normal';
 }
+function formatGeminiQuota(source) {
+  if (!isRecord(source) || !Number.isFinite(source.fetchedAt) || source.fetchedAt <= 0 || Date.now() - source.fetchedAt > 150000) return null;
+  function windowValue(key, label) {
+    const sourceWindow = source[key];
+    const rawPercent = sourceWindow?.remainingPercent;
+    const percent = Number.isFinite(rawPercent) && rawPercent >= 0 && rawPercent <= 100 ? Math.round(rawPercent) : null;
+    const resetsAt = Number.isFinite(sourceWindow?.resetsAt) && sourceWindow.resetsAt > 0 ? sourceWindow.resetsAt : null;
+    const reset = resetsAt === null ? null : formatResetTime(resetsAt / 1000);
+    return { key, label, percent, resetsAt, tone: quotaTone(percent),
+      title: `${label}：${percent === null ? '暂不可用' : `剩余 ${percent}%`}${reset ? `，${reset} 重置` : ''}` };
+  }
+  const weekly = windowValue('weekly', 'Gemini 周额度');
+  const fiveHour = windowValue('fiveHour', 'Gemini 5h额度');
+  if (weekly.percent === null && fiveHour.percent === null) return null;
+  return { weekly, fiveHour, fetchedAt: source.fetchedAt };
+}
 function unavailableValue(current, title = '暂时无法读取 Codex 用量，正在自动重试') {
-  return { ...current, percent: null, title, tone: 'muted', stale: true,
+  const geminiQuota = current?.geminiQuota ? {
+    ...current.geminiQuota, stale: true,
+    weekly: { ...current.geminiQuota.weekly, percent: null, tone: 'muted', title: 'Gemini 周额度：暂不可用' },
+    fiveHour: { ...current.geminiQuota.fiveHour, percent: null, tone: 'muted', title: 'Gemini 5h额度：暂不可用' }
+  } : null;
+  const displayTitle = current?.mode === 'combined' ? `${title}\nGemini 周额度：暂不可用\nGemini 5h额度：暂不可用` : title;
+  return { ...current, percent: null, title: displayTitle, tone: 'muted', stale: true, geminiQuota,
     rings: current?.rings?.map(ring => ({ ...ring, percent: null, tone: 'muted', title: `${ring.label}：暂不可用` })) ?? null };
 }
 function formatRateLimits(response) {
   const single = formatPrimaryRateLimits(response);
   single.tone = quotaTone(single.percent);
+  const geminiQuota = formatGeminiQuota(response?.geminiQuota);
+  if (geminiQuota) {
+    return { ...single, mode: 'combined', rings: null, geminiQuota,
+      codexLabel: single.windowLabel === '周' ? 'Codex 周' : 'Codex 5h',
+      title: ['Gemini 剩余额度', geminiQuota.weekly.title, geminiQuota.fiveHour.title, `Codex：${single.title}`].join('\n') };
+  }
+  single.geminiQuota = null;
   const snapshot = pickCodexSnapshot(response);
   const planType = String(snapshot?.planType ?? response?.planType ?? '').toLowerCase();
   if (planType !== 'plus') return { ...single, mode: 'single', rings: null };
@@ -181,7 +210,7 @@ class AppServerClient extends require('node:events').EventEmitter {
 }
 
 function installUsageBadge() {
-  const VERSION = 46;
+  const VERSION = 49;
   const KEY = '__codexUsageBadge';
   if (window[KEY]?.version === VERSION) {
     window[KEY].place();
@@ -211,7 +240,25 @@ function installUsageBadge() {
   secondaryMeter.className = 'usage-secondary';
   secondaryMeter.innerHTML = meterMarkup('-weekly');
   secondaryMeter.hidden = true;
-  badge.append(primaryMeter, secondaryMeter);
+  const combinedPanel = document.createElement('div');
+  combinedPanel.className = 'usage-combined';
+  combinedPanel.hidden = true;
+  combinedPanel.innerHTML = `
+    <div class="gemini-rings" role="group" aria-label="Gemini 剩余额度">
+      <svg class="gemini-ring gemini-ring-five-hour" viewBox="0 0 36 36">
+        <circle class="gemini-track" cx="18" cy="18" r="15" pathLength="100"/>
+        <circle class="gemini-value gemini-five-hour-value" cx="18" cy="18" r="15" pathLength="100"/>
+      </svg>
+      <svg class="gemini-ring gemini-ring-weekly" viewBox="0 0 36 36">
+        <circle class="gemini-track" cx="18" cy="18" r="10.5" pathLength="100"/>
+        <circle class="gemini-value gemini-weekly-value" cx="18" cy="18" r="10.5" pathLength="100"/>
+      </svg>
+    </div>
+    <span class="gemini-name">Gemini</span>
+    <div class="codex-summary" role="meter">
+      <span class="codex-label">Codex</span><span class="codex-number">—</span>
+    </div>`;
+  badge.append(primaryMeter, secondaryMeter, combinedPanel);
   const tooltip = document.createElement('div');
   tooltip.id = 'codex-usage-tooltip';
   tooltip.setAttribute('role', 'tooltip');
@@ -227,6 +274,8 @@ function installUsageBadge() {
       --usage-border: #ffffff17; --usage-border-hover: #ffffff29;
       --usage-surface: linear-gradient(145deg, #414341 0%, #292b29 52%, #363936 100%);
       --usage-shadow: inset 0 1px 1px #ffffff12, inset 0 -1px 1px #0002, 0 2px 5px #0002;
+      --gemini-blue: #8ab4f8; --gemini-green: #62cf91;
+      --gemini-blue-track: #8ab4f833; --gemini-green-track: #62cf9133;
   `;
   style.textContent = `
     #codex-usage-badge {
@@ -238,6 +287,8 @@ function installUsageBadge() {
       --usage-border: #52647424; --usage-border-hover: #52647440;
       --usage-surface: linear-gradient(145deg, #fcfdfd 0%, #f3f5f6 52%, #e9eef0 100%);
       --usage-shadow: inset 0 1px 0 #fff, inset 0 -1px 1px #23324008, 0 2px 5px #26384712;
+      --gemini-blue: #1a73e8; --gemini-green: #188038;
+      --gemini-blue-track: #1a73e833; --gemini-green-track: #18803833;
       --usage-color: var(--usage-normal-color); --usage-soft: var(--usage-normal-soft);
       --usage-ring-track: var(--usage-normal-track); --usage-glow: var(--usage-normal-glow);
       --usage-width: 34px; --usage-ring-size: 26px;
@@ -254,8 +305,24 @@ function installUsageBadge() {
     }
     #codex-usage-badge[hidden], #codex-usage-tooltip[hidden] { display: none !important; }
     #codex-usage-badge .usage-primary { display: contents; }
-    #codex-usage-badge .usage-secondary[hidden] { display: none !important; }
+    #codex-usage-badge .usage-primary[hidden], #codex-usage-badge .usage-secondary[hidden], #codex-usage-badge .usage-combined[hidden] { display: none !important; }
     #codex-usage-badge[data-mode="dual"] { height: 144px; flex-basis: 144px; justify-content: flex-start; padding: 37px 2px 8px; }
+    #codex-usage-badge[data-mode="combined"] {
+      padding: 5px 2px; justify-content: flex-start;
+    }
+    #codex-usage-badge .usage-combined { box-sizing: border-box; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    #codex-usage-badge .gemini-rings { position: relative; flex: 0 0 var(--usage-ring-size); width: var(--usage-ring-size); height: var(--usage-ring-size); }
+    #codex-usage-badge .gemini-ring { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; }
+    #codex-usage-badge .gemini-ring circle { fill: none; stroke-width: 3.6; }
+    #codex-usage-badge .gemini-ring-five-hour .gemini-track { stroke: var(--gemini-blue-track); }
+    #codex-usage-badge .gemini-ring-five-hour .gemini-value { stroke: var(--gemini-blue); }
+    #codex-usage-badge .gemini-ring-weekly .gemini-track { stroke: var(--gemini-green-track); }
+    #codex-usage-badge .gemini-ring-weekly .gemini-value { stroke: var(--gemini-green); }
+    #codex-usage-badge .gemini-value { stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; transform: rotate(-90deg); transform-origin: 18px 18px; transition: stroke-dashoffset 240ms ease; }
+    #codex-usage-badge .gemini-name { font-size: 8px; line-height: 10px; font-weight: 600; }
+    #codex-usage-badge .codex-summary { box-sizing: border-box; width: 100%; margin-top: 2px; padding-top: 4px; border-top: 1px solid var(--usage-border); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    #codex-usage-badge .codex-number { font-size: 10.5px; line-height: 12px; font-weight: 650; letter-spacing: -.2px; white-space: nowrap; }
+    #codex-usage-badge .codex-label { color: var(--usage-label); font-size: 8px; line-height: 9px; white-space: nowrap; }
     #codex-usage-badge .usage-secondary {
       --usage-color: var(--usage-normal-color); --usage-soft: var(--usage-normal-soft);
       --usage-ring-track: var(--usage-normal-track); --usage-glow: var(--usage-normal-glow);
@@ -311,7 +378,7 @@ function installUsageBadge() {
         background: var(--color-surface-elevated-secondary, #2c2e2c); color: var(--color-text-primary, #edf0ed);
       }
     }
-    @media (prefers-reduced-motion: reduce) { #codex-usage-badge .usage-ring-value { transition: none; } }
+    @media (prefers-reduced-motion: reduce) { #codex-usage-badge .usage-ring-value, #codex-usage-badge .gemini-value { transition: none; } }
   `;
   let value = { percent: null, title: '正在读取 Codex 剩余用量', tone: 'muted', windowLabel: '', mode: 'single', rings: null };
   let placementTimer = null;
@@ -321,7 +388,15 @@ function installUsageBadge() {
   // A dead agent must not leave a healthy-looking quota indefinitely.
   function expireValue() {
     if (disposed || value.stale || !Number.isFinite(value.updatedAt) || Date.now() - value.updatedAt < 150000) return;
-    value = { ...value, stale: true, percent: null, tone: 'muted', title: '用量数据已过期，正在等待重新连接',
+    const geminiQuota = value.geminiQuota ? {
+      ...value.geminiQuota, stale: true,
+      weekly: { ...value.geminiQuota.weekly, percent: null, tone: 'muted', title: 'Gemini 周额度：暂不可用' },
+      fiveHour: { ...value.geminiQuota.fiveHour, percent: null, tone: 'muted', title: 'Gemini 5h额度：暂不可用' }
+    } : null;
+    const title = value.mode === 'combined'
+      ? '用量数据已过期，正在等待重新连接\nGemini 周额度：暂不可用\nGemini 5h额度：暂不可用'
+      : '用量数据已过期，正在等待重新连接';
+    value = { ...value, stale: true, percent: null, tone: 'muted', title, geminiQuota,
       rings: value.rings?.map(ring => ({ ...ring, percent: null, tone: 'muted', title: `${ring.label}：暂不可用` })) ?? null };
     render();
   }
@@ -371,19 +446,56 @@ function installUsageBadge() {
       for (const attr of ['role', 'aria-label', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'aria-valuetext']) element.removeAttribute(attr);
     }
   }
+  function renderGeminiWindow(key, selector, label) {
+    const meter = value.geminiQuota?.[key] ?? { percent: null, title: `${label}：暂不可用` };
+    const percent = Number.isFinite(meter.percent) ? Math.max(0, Math.min(100, Math.round(meter.percent))) : null;
+    const meterElement = combinedPanel.querySelector(selector);
+    const ring = meterElement.querySelector('.gemini-value');
+    ring.style.strokeDashoffset = String(100 - (percent ?? 0));
+    ring.style.opacity = percent !== null && percent > 0 ? '1' : '0';
+    meterElement.setAttribute('role', 'meter');
+    meterElement.setAttribute('aria-label', label);
+    meterElement.setAttribute('aria-valuemin', '0');
+    meterElement.setAttribute('aria-valuemax', '100');
+    meterElement.setAttribute('aria-valuetext', meter.title);
+    if (percent === null) meterElement.removeAttribute('aria-valuenow');
+    else meterElement.setAttribute('aria-valuenow', String(percent));
+  }
+  function renderCombined() {
+    renderGeminiWindow('fiveHour', '.gemini-ring-five-hour', 'Gemini 5h额度');
+    renderGeminiWindow('weekly', '.gemini-ring-weekly', 'Gemini 周额度');
+    const percent = Number.isFinite(value.percent) ? Math.max(0, Math.min(100, Math.round(value.percent))) : null;
+    const number = percent === null ? '—' : `${percent}%`;
+    const codexSummary = combinedPanel.querySelector('.codex-summary');
+    if (codexSummary.querySelector('.codex-number').textContent !== number) codexSummary.querySelector('.codex-number').textContent = number;
+    const label = value.codexLabel ?? (value.windowLabel === '周' ? 'Codex 周' : 'Codex 5h');
+    codexSummary.setAttribute('role', 'meter');
+    codexSummary.setAttribute('aria-label', label);
+    codexSummary.setAttribute('aria-valuemin', '0'); codexSummary.setAttribute('aria-valuemax', '100');
+    codexSummary.setAttribute('aria-valuetext', value.title);
+    if (percent === null) codexSummary.removeAttribute('aria-valuenow');
+    else codexSummary.setAttribute('aria-valuenow', String(percent));
+    codexSummary.dataset.tone = value.tone;
+  }
   function render() {
+    const combined = value.mode === 'combined' && !!value.geminiQuota;
     const dual = value.mode === 'dual' && value.rings?.length === 2;
     const percent = Number.isFinite(value.percent) ? Math.max(0, Math.min(100, Math.round(value.percent))) : null;
-    badge.dataset.mode = dual ? 'dual' : 'single';
+    badge.dataset.mode = combined ? 'combined' : dual ? 'dual' : 'single';
     badge.dataset.tone = dual ? value.rings[0].tone : value.tone;
+    primaryMeter.hidden = combined;
     secondaryMeter.hidden = !dual;
-    renderMeter(primaryMeter, dual ? value.rings[0] : {
-      ...value, label: value.windowLabel === '周' ? '周额度' : percent === null ? '用量' : '5h额度'
-    }, dual);
-    if (dual) renderMeter(secondaryMeter, value.rings[1]);
-    badge.setAttribute('role', dual ? 'group' : 'meter');
-    badge.setAttribute('aria-label', 'Codex 剩余用量');
-    if (dual) {
+    combinedPanel.hidden = !combined;
+    if (combined) renderCombined();
+    else {
+      renderMeter(primaryMeter, dual ? value.rings[0] : {
+        ...value, label: value.windowLabel === '周' ? '周额度' : percent === null ? '用量' : '5h额度'
+      }, dual);
+      if (dual) renderMeter(secondaryMeter, value.rings[1]);
+    }
+    badge.setAttribute('role', dual || combined ? 'group' : 'meter');
+    badge.setAttribute('aria-label', combined ? 'Gemini 与 Codex 剩余用量' : 'Codex 剩余用量');
+    if (dual || combined) {
       for (const attr of ['aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'aria-valuetext']) badge.removeAttribute(attr);
     } else {
       badge.setAttribute('aria-valuemin', '0'); badge.setAttribute('aria-valuemax', '100');
@@ -439,7 +551,7 @@ function installUsageBadge() {
     status() {
       return { version: VERSION, placed: badge.parentElement === rail && visible(badge) && !badge.hidden,
         percent: value.percent, windowLabel: value.windowLabel, tone: value.tone, mode: value.mode, rings: value.rings,
-        updatedAt: value.updatedAt ?? null, stale: value.stale ?? false,
+        geminiQuota: value.geminiQuota ?? null, updatedAt: value.updatedAt ?? null, stale: value.stale ?? false,
         badgeCount: document.querySelectorAll('#codex-usage-badge').length };
     },
     destroy() {

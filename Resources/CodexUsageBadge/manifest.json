@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "product": "Codex Usage Badge",
   "upstreamVersion": "0.9.1",
-  "buildId": "mintzz-optimized-gpt-folder-sync-sg-sin",
-  "pinnedAgentSHA256": "d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db",
+  "buildId": "mintzz-gemini-quota",
+  "pinnedAgentSHA256": "0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69",
   "originalRepository": "https://github.com/jaykinhoo9/codex-usage-badge",
   "license": "MIT",
   "runtimeFiles": [
@@ -19,9 +19,9 @@
   "files": {
     "LICENSE": "4d8a4ca224f090dc1225e603aae39d6d4dbefa34dcf7515f70c886806329a755",
     "NOTICE.md": "03689f46623061dc2f11093219c4809a03f5b39de080d21a8e5ad996f80540fb",
-    "agent.cjs": "d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db",
-    "health.cjs": "9e0aa82da5eed053bce9e49e28dd0d0e9a4738a0d32b080c3c93c9efa2573371",
-    "local-customization/project-thread-color/agent-folder-color.cjs": "d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db",
+    "agent.cjs": "0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69",
+    "health.cjs": "1188e58e96b2160686b734ddbe0284900a0af2831860f5157dccb55f6d6bf267",
+    "local-customization/project-thread-color/agent-folder-color.cjs": "0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69",
     "local-customization/project-thread-color/backup-before-gpt-project-association/agent.cjs": "9ade7f6e7388c4408551fcf843ecb9a8691e8223ba9334619a5148071cc549c6",
     "local-customization/project-thread-color/backup-v0.9.1/README.txt": "9c9b838c7a1c088ae5084b6640cec32f28dc13a478f265ee5d94207b306baee8",
     "local-customization/project-thread-color/backup-v0.9.1/SHA256SUMS.txt": "52d054ca4ec258b7756f7634bdcaba9ff00e2cae19c65fb2de58fe5e6b81430c",
@@ -37,16 +37,16 @@
     "local-customization/project-thread-color/启动ChatGPT并加载外观.command": "439c0db6fbbd179f16bbf63d831a42bd35543d2207476c2db717c6bfa8c04f3b",
     "local-customization/project-thread-color/回退到GPT文件夹映射修复前.command": "d84af2bcde44910174235e6b2844fb5daf7801f3836731e40dccb390cad159f2",
     "local-customization/project-thread-color/回退到原版.command": "7165866c1d687130fc0c5e343c44070164b8d2e430cb33183ca5e7d7317cfc25",
-    "local-customization/project-thread-color/当前优化版记录.json": "7f6ab9cabb4638d49b52cadcbc98d569c3436cdb503e136e47d66a9949f8191c",
-    "local-customization/project-thread-color/恢复优化版.command": "50a5fd92fd52ff2609051bfe0fe14c417e9854f72cfe71a6aac167a581f55c0b",
-    "local-customization/project-thread-color/说明.txt": "0daf9add7818dd83692827d8ce877120c1e7a212321b14fba0a8671b00a60221",
+    "local-customization/project-thread-color/当前优化版记录.json": "fe8eb45c06e99fef9068530b1a31310df3f8321e4ecf3415206bb605d4f41d2d",
+    "local-customization/project-thread-color/恢复优化版.command": "0fd84ff1b9ce0e58ef633b0e6d617b2ede99ad31101dd6067094959f7c15162e",
+    "local-customization/project-thread-color/说明.txt": "3b3654277c366d52849a874575fd12ede964d450cb4758bb9ed1749a2e3191de",
     "macos/shortcuts.cjs": "87ec8d2e271e1b01bdeb90a6d9a8c324b5735c2b75d10fff5a3550ee0e40f5dd",
     "macos/startup/bridge": "67b3cbcaabb985ac378a62a313f861e23cebf3227a947a688c64ccd047bc4142",
     "macos/startup/controller.cjs": "1c0e6e36aa5b63da69351da82a90d0855ddb0d18717847e25057c1e342b468be",
     "macos/startup/watch.cjs": "5c8d2794b0047e8ea9c5f3c5af27d5c7570f5df78ce96356067b44d52c18acc0",
-    "manage.cjs": "dbf1493f29d5cc8ddf80a669412fd480f5160d1b9f5a778d8d042c4fb231e13e",
+    "manage.cjs": "d3c46cb4a59265aff7bad4e63d8b30e2baf0b063a975fb311ef2360dedf8b4ad",
     "network-agent.cjs": "7d802059a49571c78f6415e92a565ca8bd8af5a8b0197d45c5532bdc96ed5bbf",
     "network-health.cjs": "93328235300afa0c99cd079d91d360a57ae41cae71741aaf68a96fe64a5dcb56",
-    "shared-quota.cjs": "f279afb7b9d7d414560b1d471becaae8557e63f8beb2674a50fc670e7b200633"
+    "shared-quota.cjs": "bd28d366da1874daacf0e2081084e87a6bf5be1d7e4f39576f6bcdf6e12fecb6"
   }
 }

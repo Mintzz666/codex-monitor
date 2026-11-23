@@ -15,6 +15,10 @@ Codex Monitor ── unauthenticated public JSON ──► codex-reset.com
 WidgetKit reads a sanitized App Group snapshot. Supported development and ad-hoc
 configurations can provide widget data through the local loopback usage bridge.
 
+Monitor adds the Gemini weekly and 5-hour values, reset times and fetch time to
+the same loopback response for the sidebar badge. It holds Gemini readings in
+memory. The widget and persistent Codex cache continue to use the Codex snapshot.
+
 ## macOS boundary
 
 The app launches the locally installed Codex app-server and requests account,
@@ -37,15 +41,8 @@ from [codex-reset.com](https://codex-reset.com/developers). These requests need
 no authentication, use a marked `User-Agent`, and send no cookies, account
 identifiers, Codex credentials, or quota-usage values.
 
-The daily Token chart marks only community-history records that are confirmed,
-global resets. Banked resets and announcements or forecasts are excluded. Event
-dates are shown in the Mac's local time zone, and selecting a marker opens the
-original Tibo post. A marker documents a community-recorded global event; it
-does not verify delivery to any individual account.
-
-Below the chart, the app displays the source's raw 24-hour and 48-hour reset
-probabilities, plus its confidence and update time. It does not invent 12-hour
-or 36-hour values. While the app runs, it checks the source about every five
+The menu displays the source's 24-hour and 48-hour reset probabilities,
+confidence and update time. While the app runs, it checks the source about every five
 minutes; manual refresh can request an update sooner. The client honors
 `Retry-After` on HTTP 429 responses. If a forecast is over 30 minutes old or a
 source check fails, the app hides the probability values and keeps cached reset
@@ -70,6 +67,12 @@ history available.
   the existing wake handler refreshes stale data. These hooks run inside the app.
 - Reset data: unauthenticated public JSON requests to codex-reset.com; no
   account-specific data is sent.
+- Gemini quota comes from the running Antigravity client's loopback service or
+  the official CLI bundled with Gemini for Mac. The CLI uses your Google sign-in
+  to run the read-only `/usage` command. Monitor does not read Google OAuth
+  tokens. It keeps the Antigravity local request token in process memory and
+  sends it only to the authenticated local service. Gemini refresh is separate
+  from Codex refresh.
 - Project: no analytics, ads, telemetry SDK, cloud database, or Codex
   Monitor-operated backend.
 

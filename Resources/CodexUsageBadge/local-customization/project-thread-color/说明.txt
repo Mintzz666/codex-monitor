@@ -1,7 +1,7 @@
 Codex Usage Badge 本机优化构建
 
-当前标准构建：mintzz-optimized-gpt-folder-sync-sg-sin（上游 v0.9.1）
-SHA-256：d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db
+当前标准构建：mintzz-gemini-quota（上游 v0.9.1）
+SHA-256：0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69
 版本记录核验日期：2026-10-04
 详细版本记录：当前优化版记录.json
 

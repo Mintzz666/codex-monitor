@@ -37,11 +37,11 @@ IDs, provisioning profiles, or personal email addresses.
 
 ## 3. Build artifacts
 
-The current package version is 1.5.0, Build 50. `project.yml` is the version
+The current package version is 1.6.0, Build 60. `project.yml` is the version
 source for the build scripts and CI. Historical release assets remain unchanged.
 
 ```sh
-VERSION=1.5.0 BUILD_NUMBER=50 make release-package
+make release-package
 ```
 
 Then run `python3 Scripts/verify_release_artifact.py`. It checks signatures,
@@ -51,8 +51,8 @@ privacy, the DMG checksum and the exact app inside the read-only mounted DMG.
 This creates:
 
 - `dist/Codex Monitor.app`
-- `dist/Codex-Monitor-v1.5.0-universal.dmg`
-- `dist/Codex-Monitor-v1.5.0-universal.dmg.sha256`
+- `dist/Codex-Monitor-v1.6.0-universal.dmg`
+- `dist/Codex-Monitor-v1.6.0-universal.dmg.sha256`
 
 Without signing environment variables, the output is ad-hoc signed. Optional
 notarization runs only when `APPLE_NOTARY_KEY_BASE64` and the related notary
@@ -63,7 +63,7 @@ Verify the checksum:
 
 ```sh
 cd dist
-shasum -a 256 -c Codex-Monitor-v1.5.0-universal.dmg.sha256
+shasum -a 256 -c Codex-Monitor-v1.6.0-universal.dmg.sha256
 ```
 
 ## 4. Tag and GitHub Release
@@ -73,11 +73,11 @@ release check and deterministic verifier, builds the DMG, and uploads the DMG
 and checksum to a GitHub Release.
 
 ```sh
-git tag -a v1.5.0 -m "Codex Monitor 1.5.0"
-git push origin v1.5.0
+git tag -a v1.6.0 -m "Codex Monitor 1.6.0"
+git push origin v1.6.0
 ```
 
-For a manual release, use the text in `docs/release-notes/v1.5.0.md` and upload
+For a manual release, use the text in `docs/release-notes/v1.6.0.md` and upload
 only the current DMG and its matching checksum.
 
 ## 5. Post-release verification

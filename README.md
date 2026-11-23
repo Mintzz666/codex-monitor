@@ -24,19 +24,18 @@ one place. No separate Badge installation is required.
 
 | At a glance | On your desktop | Inside ChatGPT |
 |---|---|---|
-| Remaining quota, reset time and recent Token activity | Medium and large WidgetKit widgets | Folder colors, Recent thread matching, Token shades and reset labels |
+| Codex and Gemini quota with reset times | Medium and large WidgetKit widgets | Quota badge, folder colors, Recent thread matching and Token shades |
 
 <p align="center"><img src="docs/images/usage-popover-en.png" width="344" alt="Codex Monitor English menu preview with example usage values" /></p>
 <p align="center"><sub>Preview with example usage values. The app supports English and Simplified Chinese.</sub></p>
 
-## New in 1.5
+## New in 1.6
 
-- Reset countdown in English and Simplified Chinese.
-- Login recovery for untouched restored windows, with focus protection.
-- Visible startup-helper health, short-lived status caching and bounded checks.
-- Runtime-only packaging, a smaller shared-quota entry point and rollback-safe updates.
+- Three compact quota bars for Codex weekly, Gemini weekly and Gemini 5-hour usage.
+- An in-sidebar badge with two Gemini rings, reset times on hover and the Codex percentage below.
+- Background Gemini quota reads using the signed-in CLI bundled with Gemini for Mac when both desktop apps are closed.
 
-See the [1.5.0 release notes](docs/release-notes/v1.5.0.md) for validation and limits.
+See the [1.6.0 release notes](docs/release-notes/v1.6.0.md) for requirements.
 
 ## Sidebar colors that stay with your projects
 
@@ -74,6 +73,7 @@ ChatGPT with ⌘Q and reopen it from its usual icon; no reinstall is needed.
 | Component | Source | Refresh |
 |---|---|---|
 | Menu bar app | Local `codex app-server` | About once a minute after a successful read |
+| Gemini quota | Running Antigravity or the signed-in CLI bundled with Gemini for Mac | About once a minute with Antigravity open, about every two minutes via CLI |
 | Desktop widgets | Sanitized App Group snapshot; loopback fallback for supported builds | WidgetKit timeline |
 | ChatGPT appearance | The same Monitor quota snapshot; included local helper | About every 5 seconds |
 | Global reset radar | Public [codex-reset.com](https://codex-reset.com/) records and forecast | About every 5 minutes while Monitor runs |
@@ -122,7 +122,8 @@ No analytics, ads, cloud database or Monitor-operated backend. Usage is read
 through the local Codex app-server; credentials remain under Codex’s control.
 Account-change checks read the local authentication file to derive an identity
 fingerprint, without using access or refresh token values. Public reset-data
-requests send no Codex credentials or quota data.
+requests send no Codex credentials or quota data. Gemini uses the local Google
+client and its existing sign-in. Gemini quota is kept in memory.
 
 [Architecture & privacy](docs/architecture-and-privacy.md) ·
 [Release process](docs/releasing.md) ·

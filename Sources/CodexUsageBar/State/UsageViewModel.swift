@@ -1,3 +1,4 @@
+import AppKit
 import CodexUsageCore
 import CodexUsageShared
 import Combine
@@ -26,9 +27,12 @@ final class UsageViewModel: ObservableObject {
   @Published private(set) var usageHistory: [UsageHistoryPoint]
   @Published private(set) var resetRadar: ResetRadarSnapshot?
   @Published private(set) var resetRadarError: String?
+  @Published private(set) var geminiQuota: GeminiQuotaSnapshot?
+  @Published private(set) var geminiQuotaIsStale = false
 
   private let client: CodexAppServerClient
   private let resetRadarClient = ResetRadarClient()
+  private let antigravityQuotaClient = AntigravityQuotaClient()
   private let sharedUsageStore: SharedUsageStore
   private let sharedWidgetPreferencesStore: SharedWidgetPreferencesStore
   private let localUsageServer: LocalUsageSnapshotServer
@@ -38,6 +42,9 @@ final class UsageViewModel: ObservableObject {
   private var refreshLoop: Task<Void, Never>?
   private var isResetRadarRefreshing = false
   private var lastResetRadarAttempt: Date?
+  private var lastGeminiQuotaAttempt: Date?
+  private var geminiTargetPID: pid_t?
+  private var isGeminiQuotaRefreshing = false
   private var consecutiveRefreshFailures = 0
   private var observedAccountFingerprint = CredentialIdentity.currentFingerprint()
   private static let resetRadarStorageKey = "codex-reset-radar-v1"
@@ -173,6 +180,7 @@ final class UsageViewModel: ObservableObject {
     if !accountChanged, let lastUpdated,
       Date().timeIntervalSince(lastUpdated) < maxAge
     {
+      scheduleGeminiQuotaRefresh()
       await refreshResetRadarIfStale()
       return
     }
@@ -181,6 +189,7 @@ final class UsageViewModel: ObservableObject {
 
   func refresh(forceRadar: Bool = false) async {
     _ = invalidateForAccountChangeIfNeeded()
+    scheduleGeminiQuotaRefresh(force: forceRadar)
     guard !isRefreshing else {
       return
     }
@@ -225,11 +234,69 @@ final class UsageViewModel: ObservableObject {
     await radarRefresh
   }
 
+  private func scheduleGeminiQuotaRefresh(force: Bool = false) {
+    Task { [weak self] in
+      await self?.refreshGeminiQuotaIfStale(force: force)
+    }
+  }
+
+  private func refreshGeminiQuotaIfStale(force: Bool = false) async {
+    let application = NSRunningApplication.runningApplications(
+      withBundleIdentifier: "com.google.antigravity"
+    )
+    .first { !$0.isTerminated }
+    if geminiTargetPID != application?.processIdentifier {
+      geminiTargetPID = application?.processIdentifier
+      lastGeminiQuotaAttempt = nil
+      geminiQuota = nil
+      geminiQuotaIsStale = false
+      localUsageServer.updateGeminiQuota(nil)
+    }
+    guard !isGeminiQuotaRefreshing else {
+      return
+    }
+    let now = Date()
+    let interval: TimeInterval = application == nil ? 115 : 45
+    if !force, let lastGeminiQuotaAttempt, now.timeIntervalSince(lastGeminiQuotaAttempt) < interval
+    {
+      return
+    }
+    isGeminiQuotaRefreshing = true
+    lastGeminiQuotaAttempt = now
+    defer { isGeminiQuotaRefreshing = false }
+    let result: GeminiQuotaSnapshot?
+    if let bundle = application?.bundleURL {
+      result = try? await antigravityQuotaClient.fetch(antigravityBundle: bundle)
+    } else if let executable = NSWorkspace.shared.urlForApplication(
+      withBundleIdentifier: "com.google.GeminiMacOS")?
+      .appendingPathComponent("Contents/Helpers/agy"),
+      FileManager.default.isExecutableFile(atPath: executable.path)
+    {
+      result = try? await antigravityQuotaClient.fetchFromCLI(executable: executable)
+    } else {
+      result = nil
+    }
+    guard application?.isTerminated != true, geminiTargetPID == application?.processIdentifier
+    else {
+      return
+    }
+    if let result {
+      geminiQuota = result
+      geminiQuotaIsStale = false
+      localUsageServer.updateGeminiQuota(result)
+    } else {
+      geminiQuotaIsStale = true
+      localUsageServer.updateGeminiQuota(nil)
+    }
+  }
+
   func refreshResetRadarIfStale(force: Bool = false) async {
     guard !isResetRadarRefreshing else { return }
     if !force, let lastResetRadarAttempt,
       Date().timeIntervalSince(lastResetRadarAttempt) < 300
-    { return }
+    {
+      return
+    }
     isResetRadarRefreshing = true
     lastResetRadarAttempt = Date()
     defer { isResetRadarRefreshing = false }
@@ -380,6 +447,13 @@ final class UsageViewModel: ObservableObject {
       )
     )
     lastUpdated = previewDate
+    geminiQuota = GeminiQuotaSnapshot(
+      weekly: GeminiQuotaWindow(
+        remainingPercent: 62, resetsAt: previewDate.addingTimeInterval(5 * 86_400)),
+      fiveHour: GeminiQuotaWindow(
+        remainingPercent: 91, resetsAt: previewDate.addingTimeInterval(102 * 60)),
+      fetchedAt: previewDate
+    )
     if let lastUpdated {
       usageHistory = [12, 19, 27, 31, 43, 52, 64].enumerated().map {
         index, percent in

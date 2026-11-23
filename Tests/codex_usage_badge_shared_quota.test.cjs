@@ -18,7 +18,7 @@ const {
   installSharedQuotaAdapter
 } = require('../Resources/CodexUsageBadge/shared-quota.cjs');
 
-const PINNED_AGENT_SHA256 = 'd6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db';
+const PINNED_AGENT_SHA256 = '0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69';
 const FUNCTION_SHA256 = {
   installProjectColors: '317b03ec71c69152a483a74339261bc3af5862e347cedda2e302add33d111506',
   installThreadTokens: '062eaf3025419b9dd585406c7cc0b5966c6a4217b7915f1da22b0efb7d627148',
@@ -191,6 +191,36 @@ test('accepts auth.json account_id fallback and tilde-expanded CODEX_HOME', t =>
     homeDirectory: root
   });
   assert.equal(fingerprint, identityFingerprint(codexHome, 'root-account'));
+});
+
+test('validates Gemini windows independently of the verified Codex quota', async t => {
+  const home = createCodexHome();
+  t.after(() => home.cleanup());
+  home.writeAuth('account-a');
+  const fetchedAt = NOW / 1000 - COCOA_EPOCH_OFFSET_SECONDS;
+  const snapshot = sharedSnapshot(home.home, 'account-a');
+  const geminiQuota = {
+    fetchedAt,
+    weekly: { remainingPercent: 62, resetsAt: fetchedAt + 3_600, accountId: 'ignored' },
+    fiveHour: { remainingPercent: 91, resetsAt: null }
+  };
+  const server = await createServer(calls => encoded({
+    snapshot,
+    geminiQuota: calls === 1 ? geminiQuota : { ...geminiQuota, fetchedAt: fetchedAt - 151 }
+  }));
+  t.after(() => server.close());
+  const client = new TrapAppServerClient();
+  t.after(createAdapter(client, home.home, [server.port]));
+
+  const fresh = await client.start();
+  assert.deepEqual(fresh.geminiQuota, {
+    fetchedAt: NOW,
+    weekly: { remainingPercent: 62, resetsAt: NOW + 3_600_000 },
+    fiveHour: { remainingPercent: 91, resetsAt: null }
+  });
+  const stale = await client.refresh();
+  assert.equal(Object.hasOwn(stale, 'geminiQuota'), false);
+  assert.equal(stale.rateLimits.primary.usedPercent, 32);
 });
 
 test('loads a direct SharedUsageSnapshot and emits normal merged rate-limits', async t => {

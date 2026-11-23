@@ -2,9 +2,9 @@
   "recorded_at": "2026-10-04",
   "product": "Codex Usage Badge",
   "upstream_release": "0.9.1",
-  "build_id": "mintzz-optimized-gpt-folder-sync-sg-sin",
+  "build_id": "mintzz-gemini-quota",
   "canonical_file": "agent-folder-color.cjs",
-  "sha256": "d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db",
+  "sha256": "0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69",
   "active_file": "../agent.cjs",
   "features": [
     "Conversation markers inherit the exact containing project-folder color in ChatGPT and Codex views.",

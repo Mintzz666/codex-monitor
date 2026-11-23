@@ -8,6 +8,7 @@ struct CodexUsageVerifier {
   static func main() async {
     do {
       try runUnitChecks()
+      try verifyAntigravityQuotaDecoding()
       try await verifyAppServerCompatibility()
       try await SharedQuotaChecks.run()
       try await NetworkChecks.run()
@@ -550,6 +551,44 @@ struct CodexUsageVerifier {
     )
   }
 
+  private static func verifyAntigravityQuotaDecoding() throws {
+    let data = Data(
+      """
+      {"response":{"groups":[
+        {"displayName":"Gemini 4 Argon","buckets":[
+          {"bucketId":"gemini-argon-wtu-weekly","window":"weekly","remainingFraction":0.75}]},
+        {"displayName":"Gemini Models","buckets":[
+          {"bucketId":"gemini-5h","resetTime":"2026-12-01T02:00:00.000Z"},
+          {"bucketId":"gemini-weekly","remainingFraction":0.625,"resetTime":"2026-12-06T02:00:00Z"}]}
+      ]}}
+      """.utf8)
+    let now = Date()
+    let quota = try AntigravityQuotaClient.decode(data, fetchedAt: now)
+    try expect(quota.weekly?.remainingPercent == 62.5, "Gemini 周额度来自共享模型分组")
+    try expect(quota.fiveHour?.remainingPercent == 0, "有重置时间且 Protobuf 省略零值时识别为额度耗尽")
+    try expect(quota.fiveHour?.resetsAt != nil, "Gemini 5 小时重置时间支持毫秒")
+    try expect(!quota.isStale(relativeTo: now), "新 Gemini 数据可展示")
+    try expect(quota.isStale(relativeTo: now.addingTimeInterval(151)), "过期 Gemini 数据不展示为当前额度")
+
+    let cliOutput = """
+      {"status":"SUCCESS","num_turns":0,"command":{"name":"usage","data":{"groups":[
+        {"name":"Gemini Models","buckets":[
+          {"id":"gemini-weekly","remaining_fraction":0.625,"reset_time":"2026-12-06T02:00:00Z"},
+          {"id":"gemini-5h","remaining_fraction":0.91,"reset_time":"2026-12-01T02:00:00.000Z"}]}
+      ]}}}
+      """
+    let cliQuota = try AntigravityQuotaClient.decodeCLI(Data(cliOutput.utf8), fetchedAt: now)
+    try expect(cliQuota.weekly == quota.weekly, "无界面 CLI 周额度与桌面额度使用相同格式")
+    try expect(
+      cliQuota.fiveHour?.remainingPercent == 91
+        && cliQuota.fiveHour?.resetsAt == quota.fiveHour?.resetsAt,
+      "无界面 CLI 提供 5 小时额度与重置时间")
+    let agentTurnOutput = Data(
+      cliOutput.replacingOccurrences(of: "\"num_turns\":0", with: "\"num_turns\":1").utf8)
+    try expect(
+      (try? AntigravityQuotaClient.decodeCLI(agentTurnOutput)) == nil, "只接受零对话轮次的 CLI 用量命令")
+  }
+
   private static func verifyLocalSnapshotBridge() async throws {
     let basePort = UInt16.random(in: 54_000...59_000)
     let ports = [basePort, basePort + 1, basePort + 2]
@@ -577,6 +616,25 @@ struct CodexUsageVerifier {
       }
     }
     try expect(received == expected, "本机回环同步 Widget 快照")
+
+    let quota = GeminiQuotaSnapshot(
+      weekly: GeminiQuotaWindow(remainingPercent: 62, resetsAt: nil),
+      fiveHour: GeminiQuotaWindow(remainingPercent: 91, resetsAt: Date().addingTimeInterval(600)),
+      fetchedAt: Date()
+    )
+    server.updateGeminiQuota(quota)
+    let combined = await withCheckedContinuation { continuation in
+      client.loadPayload { payload in continuation.resume(returning: payload) }
+    }
+    try expect(
+      combined?.snapshot == expected && combined?.geminiQuota == quota, "回环同步 Gemini 并保留完整 Codex 快照"
+    )
+    server.updateGeminiQuota(nil)
+    let codexOnly = await withCheckedContinuation { continuation in
+      client.loadPayload { payload in continuation.resume(returning: payload) }
+    }
+    try expect(
+      codexOnly?.snapshot == expected && codexOnly?.geminiQuota == nil, "移除 Gemini 数据后原有回环数据仍可读取")
 
     server.invalidateSnapshot()
     let invalidatedPayload = await withCheckedContinuation { continuation in

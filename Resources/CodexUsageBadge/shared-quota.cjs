@@ -198,6 +198,30 @@ function payloadSnapshot(payload) {
   return payload;
 }
 
+function cocoaDateToMilliseconds(value) {
+  if (!Number.isFinite(value)) return null;
+  const milliseconds = (value + COCOA_EPOCH_OFFSET_SECONDS) * 1000;
+  return Number.isSafeInteger(Math.round(milliseconds)) && milliseconds > 0 ? milliseconds : null;
+}
+
+function validateGeminiQuota(quota, nowMilliseconds) {
+  if (!isRecord(quota)) return null;
+  const fetchedAt = cocoaDateToMilliseconds(quota.fetchedAt);
+  if (fetchedAt === null || nowMilliseconds - fetchedAt < -5_000
+    || nowMilliseconds - fetchedAt > 150_000) return null;
+  const readWindow = window => {
+    if (!isRecord(window) || !Number.isFinite(window.remainingPercent)
+      || window.remainingPercent < 0 || window.remainingPercent > 100) return null;
+    return {
+      remainingPercent: window.remainingPercent,
+      resetsAt: cocoaDateToMilliseconds(window.resetsAt)
+    };
+  };
+  const weekly = readWindow(quota.weekly);
+  const fiveHour = readWindow(quota.fiveHour);
+  return weekly || fiveHour ? { weekly, fiveHour, fetchedAt } : null;
+}
+
 function validatePayload(text, identity, nowMilliseconds = Date.now()) {
   if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > MAX_PAYLOAD_BYTES) return null;
 
@@ -232,7 +256,11 @@ function validatePayload(text, identity, nowMilliseconds = Date.now()) {
   const rawAccountIds = collectRawAccountIds(response);
   if (rawAccountIds.some(value => typeof value !== 'string' || value.trim() !== identity.accountId)) return null;
 
-  return stripPrivateIdentityFields(response);
+  const validated = stripPrivateIdentityFields(response);
+  delete validated.geminiQuota;
+  const geminiQuota = validateGeminiQuota(snapshot.geminiQuota, nowMilliseconds);
+  if (geminiQuota) validated.geminiQuota = geminiQuota;
+  return validated;
 }
 
 async function readSharedQuota(options = {}) {

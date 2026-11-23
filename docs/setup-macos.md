@@ -117,16 +117,17 @@ scrollable on displays with limited height. Turning off launch at login is
 remembered after restarting the app. WidgetKit controls widget scheduling; the
 app publishes only a sanitized quota snapshot.
 
-The daily Token chart can show `RESET` markers for confirmed global events in
-the community history. Dates follow the Mac's local time zone, and selecting a
-marker opens the original Tibo post. These records describe public global
-events; they do not confirm that an individual account received a reset. The
-forecast below the chart shows only codex-reset.com's raw 24-hour and 48-hour
+The global reset card shows codex-reset.com's 24-hour and 48-hour
 probabilities, with confidence and source update time. The app reads public JSON
 without authentication and does not send account, credential, or quota-usage
 data. It checks about every five minutes while running; Command-R can refresh
 manually. A forecast older than 30 minutes or a failed source check hides the
 percentages while preserving cached history.
+
+Gemini weekly and 5-hour quota are optional. Sign in to Antigravity or Gemini
+for Mac. When both desktop apps are closed, Monitor uses Gemini for Mac's
+bundled `agy` CLI (1.1.11 or later) with its existing sign-in. The menu and the
+current sidebar badge show both windows whenever quota data is available.
 
 ## 6. Common failures / 常见问题
 

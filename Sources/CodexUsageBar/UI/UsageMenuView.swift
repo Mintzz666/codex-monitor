@@ -1,15 +1,7 @@
 import AppKit
-import Charts
 import CodexUsageCore
 import CodexUsageShared
 import SwiftUI
-
-private struct MenuTokenChartPoint: Identifiable {
-  let index: Int
-  let bucket: DailyTokenUsage
-
-  var id: String { bucket.id }
-}
 
 struct UsageMenuView: View {
   static let width: CGFloat = 344
@@ -22,7 +14,7 @@ struct UsageMenuView: View {
     VStack(alignment: .leading, spacing: 12) {
       header
       usageSection
-      historySection
+      resetForecastSection
       appearanceSection
 
       if let errorMessage = viewModel.errorDisplayText(for: language) {
@@ -92,35 +84,56 @@ struct UsageMenuView: View {
   private var usageSection: some View {
     VStack(alignment: .leading, spacing: 9) {
       HStack(alignment: .firstTextBaseline) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(language.text(.remainingQuota))
-            .font(.headline)
-          Text(
-            "\(language.text(.weeklyUsed)) "
-              + percentText(viewModel.snapshot?.usedPercent)
-          )
-          .font(.caption2)
-          .foregroundStyle(.secondary)
+        Text(language.text(.remainingQuota))
+          .font(.headline)
+        Spacer(minLength: 4)
+        if let geminiQuota = viewModel.geminiQuota {
+          Text(geminiFreshnessText(geminiQuota.fetchedAt))
+            .font(.system(size: 9))
+            .foregroundStyle(
+              viewModel.geminiQuotaIsStale ? Color.orange : Color.secondary
+            )
+            .lineLimit(1)
+        } else if viewModel.geminiQuotaIsStale {
+          Text(language == .simplifiedChinese ? "Gemini 暂不可用" : "Gemini unavailable")
+            .font(.system(size: 9))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
-        Spacer()
-        Text(percentText(viewModel.snapshot?.remainingPercent))
-          .font(.system(size: 32, weight: .bold, design: .rounded))
-          .monospacedDigit()
       }
 
-      UsageProgressBar(
-        value: viewModel.snapshot?.remainingPercent ?? 0,
-        color: remainingColor
+      quotaRow(
+        label: language == .simplifiedChinese ? "Codex 周额度" : "Codex weekly",
+        remainingPercent: viewModel.snapshot?.remainingPercent,
+        resetsAt: viewModel.snapshot?.resetsAt,
+        color: .primary,
+        barHeight: 9
       )
-      .accessibilityLabel(language.text(.remainingQuota))
-      .accessibilityValue(percentText(viewModel.snapshot?.remainingPercent))
 
       ForEach(viewModel.snapshot?.additionalWindows ?? []) { window in
         additionalWindowSection(window)
       }
 
       Divider()
-      detailsSection
+
+      quotaRow(
+        label: language == .simplifiedChinese ? "Gemini 周额度" : "Gemini weekly",
+        remainingPercent: viewModel.geminiQuota?.weekly?.remainingPercent,
+        resetsAt: viewModel.geminiQuota?.weekly?.resetsAt,
+        color: .green,
+        barHeight: 7
+      )
+
+      Divider()
+
+      quotaRow(
+        label: language == .simplifiedChinese ? "Gemini 5 小时额度" : "Gemini 5-hour",
+        remainingPercent: viewModel.geminiQuota?.fiveHour?.remainingPercent,
+        resetsAt: viewModel.geminiQuota?.fiveHour?.resetsAt,
+        color: .blue,
+        barHeight: 7,
+        showsRelativeCountdown: true
+      )
     }
     .padding(12)
     .background(
@@ -175,246 +188,93 @@ struct UsageMenuView: View {
     .padding(.top, 2)
   }
 
-  private var detailsSection: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
-      Label(nextResetText, systemImage: "arrow.clockwise")
-        .foregroundStyle(.secondary)
-      Spacer()
-      TimelineView(.periodic(from: .now, by: 60)) { context in
-        VStack(alignment: .trailing, spacing: 3) {
-          Text(viewModel.resetDisplayText(for: language))
-            .fontWeight(.medium)
-          if let countdown = language.resetCountdownText(
-            viewModel.snapshot?.resetsAt,
-            now: context.date
-          ) {
-            Text(countdown)
-              .font(.caption2)
-              .foregroundStyle(.secondary)
-          }
-        }
-        .monospacedDigit()
-        .accessibilityElement(children: .combine)
+  private func quotaRow(
+    label: String,
+    remainingPercent: Double?,
+    resetsAt: Date?,
+    color: Color,
+    barHeight: CGFloat,
+    showsRelativeCountdown: Bool = false
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Text(label)
+          .font(.subheadline.weight(.semibold))
+        Spacer(minLength: 8)
+        Text(percentText(remainingPercent))
+          .font(.system(size: 19, weight: .bold, design: .rounded))
+          .monospacedDigit()
+          .frame(minWidth: 42, alignment: .trailing)
       }
-    }
-    .font(.caption)
-  }
 
-  private var historySection: some View {
-    let resetEvents = Dictionary(
-      (viewModel.resetRadar?.events ?? []).map { ($0.dateKey(), $0) },
-      uniquingKeysWith: { first, _ in first }
-    )
-    return VStack(alignment: .leading, spacing: 8) {
-      HStack(alignment: .top) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(historyTitle)
-            .font(.subheadline.weight(.semibold))
-          Text(historySubtitle)
-            .font(.caption2)
+      UsageProgressBar(
+        value: remainingPercent ?? 0,
+        color: color,
+        height: barHeight
+      )
+      .accessibilityLabel(label)
+      .accessibilityValue(percentText(remainingPercent))
+
+      if showsRelativeCountdown {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+          Text(relativeResetText(resetsAt, now: context.date))
+            .font(.caption)
             .foregroundStyle(.secondary)
-        }
-        Spacer()
-        VStack(alignment: .trailing, spacing: 2) {
-          Text(language == .simplifiedChinese ? "今日" : "Today")
-            .font(.system(size: 9, weight: .medium))
-            .foregroundStyle(.secondary)
-          Text(latestDailyTokenText)
-            .font(.subheadline.weight(.bold))
             .monospacedDigit()
         }
-      }
-
-      if menuTokenPoints.isEmpty {
-        Text(
-          language == .simplifiedChinese
-            ? "暂无每日 Token 数据"
-            : "No daily token data yet"
-        )
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, minHeight: 124)
       } else {
-        Chart(menuTokenPoints) { point in
-          AreaMark(
-            x: .value("Day", point.index),
-            y: .value("Tokens", Double(point.bucket.tokens))
-          )
-          .foregroundStyle(
-            LinearGradient(
-              colors: [
-                Color.accentColor.opacity(0.22),
-                Color.accentColor.opacity(0.015),
-              ],
-              startPoint: .top,
-              endPoint: .bottom
-            )
-          )
-
-          LineMark(
-            x: .value("Day", point.index),
-            y: .value("Tokens", Double(point.bucket.tokens))
-          )
-          .foregroundStyle(Color.accentColor)
-          .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-
-          PointMark(
-            x: .value("Day", point.index),
-            y: .value("Tokens", Double(point.bucket.tokens))
-          )
-          .foregroundStyle(Color.accentColor)
-          .symbolSize(point.index == menuTokenPoints.count - 1 ? 34 : 18)
-          .accessibilityLabel(language.tokenFullDateLabel(point.bucket.startDate))
-          .accessibilityValue("\(point.bucket.tokens) Token")
-        }
-        .chartXScale(domain: -0.3...6.3)
-        .chartYScale(domain: 0...(menuTokenMaximum * 1.15))
-        .chartYAxis {
-          AxisMarks(values: .automatic(desiredCount: 3)) { value in
-            AxisGridLine()
-              .foregroundStyle(.secondary.opacity(0.13))
-            AxisValueLabel {
-              if let number = value.as(Double.self) {
-                Text(tokenText(Int64(number.rounded())))
-              }
-            }
-            .font(.system(size: 9))
-          }
-        }
-        .chartXAxis {
-          AxisMarks(values: Array(menuTokenPoints.indices)) { value in
-            AxisGridLine().foregroundStyle(.clear)
-            AxisValueLabel(
-              centered: false,
-              anchor: .top,
-              collisionResolution: .disabled
-            ) {
-              if let index = value.as(Int.self),
-                menuTokenPoints.indices.contains(index)
-              {
-                dayAxisLabel(menuTokenPoints[index])
-              }
-            }
-          }
-        }
-        .chartOverlay { proxy in
-          GeometryReader { geometry in
-            ForEach(menuTokenPoints) { point in
-              if let event = resetEvents[point.bucket.startDate],
-                let x = proxy.position(forX: point.index)
-              {
-                Link(destination: event.sourceURL) {
-                  Text("RESET")
-                    .font(.system(size: 6.5, weight: .bold, design: .rounded))
-                    .padding(.horizontal, 3)
-                    .padding(.vertical, 2)
-                    .foregroundStyle(Color.green)
-                    .background(.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 3))
-                }
-                .buttonStyle(.plain)
-                .help(resetHelp(event))
-                .accessibilityLabel(
-                  "RESET · \(language.tokenFullDateLabel(point.bucket.startDate))"
-                )
-                .position(
-                  x: geometry[proxy.plotAreaFrame].minX + x,
-                  y: geometry[proxy.plotAreaFrame].maxY + 38
-                )
-              }
-            }
-          }
-        }
-        .frame(height: 138)
+        Text(absoluteResetText(resetsAt))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .monospacedDigit()
       }
-
-      Divider()
-      resetForecastSection
-    }
-    .padding(12)
-    .background(
-      .primary.opacity(0.04),
-      in: RoundedRectangle(cornerRadius: 13, style: .continuous)
-    )
-  }
-
-  private var menuTokenPoints: [MenuTokenChartPoint] {
-    guard let dailyBuckets = viewModel.snapshot?.tokenUsage?.dailyBuckets,
-      !dailyBuckets.isEmpty
-    else { return [] }
-    let buckets = DailyTokenSeries.sevenDaysEnding(
-      on: Date(),
-      buckets: dailyBuckets
-    )
-    return buckets.enumerated().map {
-      MenuTokenChartPoint(index: $0.offset, bucket: $0.element)
     }
   }
 
-  private var menuTokenMaximum: Double {
-    Double(max(1, menuTokenPoints.map(\.bucket.tokens).max() ?? 1))
+  private func absoluteResetText(_ date: Date?) -> String {
+    guard let date else {
+      return language == .simplifiedChinese ? "重置时间未知" : "Reset time unknown"
+    }
+    let reset = language.resetDisplayText(date)
+    return language == .simplifiedChinese
+      ? "\(reset) 重置"
+      : "Reset \(reset)"
   }
 
-  private var latestDailyTokenText: String {
-    guard let tokens = menuTokenPoints.last?.bucket.tokens else {
-      return "—"
+  private func relativeResetText(_ date: Date?, now: Date) -> String {
+    guard let date else {
+      return language == .simplifiedChinese ? "重置时间未知" : "Reset time unknown"
     }
-    return tokenText(tokens)
+    let secondsRemaining = date.timeIntervalSince(now)
+    guard secondsRemaining > 0 else {
+      return language == .simplifiedChinese ? "等待重置" : "Awaiting reset"
+    }
+
+    let totalMinutes = max(1, Int(ceil(secondsRemaining / 60)))
+    let hours = totalMinutes / 60
+    let minutes = totalMinutes % 60
+    if language == .simplifiedChinese {
+      if hours > 0 {
+        return "\(hours) 小时 \(minutes) 分钟后重置"
+      }
+      return "\(minutes) 分钟后重置"
+    }
+    if hours > 0 {
+      return "Resets in \(hours)h \(minutes)m"
+    }
+    return "Resets in \(minutes)m"
   }
 
-  private var historyTitle: String {
-    language == .simplifiedChinese ? "近 7 日 Token" : "Tokens · 7 days"
-  }
-
-  private var historySubtitle: String {
-    guard let first = menuTokenPoints.first, let last = menuTokenPoints.last else {
-      return language == .simplifiedChinese ? "每日用量" : "Daily usage"
+  private func geminiFreshnessText(_ date: Date) -> String {
+    let updated = language.lastUpdatedDisplayText(date)
+    if viewModel.geminiQuotaIsStale {
+      return language == .simplifiedChinese
+        ? "Gemini 数据可能已过期 · \(updated)"
+        : "Gemini data may be stale · \(updated)"
     }
-    let range =
-      "\(language.tokenDateLabel(first.bucket.startDate))–"
-      + language.tokenDateLabel(last.bucket.startDate)
-    return range + (language == .simplifiedChinese ? " · 每日用量" : " · Daily usage")
-  }
-
-  private func tokenText(_ tokens: Int64) -> String {
-    if tokens >= 1_000_000_000 {
-      return "\(String(format: "%.1f", Double(tokens) / 1_000_000_000))B"
-    }
-    if tokens >= 1_000_000 {
-      return "\(String(format: "%.1f", Double(tokens) / 1_000_000))M"
-    }
-    if tokens >= 1_000 {
-      return "\(String(format: "%.1f", Double(tokens) / 1_000))K"
-    }
-    return "\(tokens)"
-  }
-
-  private func dayAxisLabel(_ point: MenuTokenChartPoint) -> some View {
-    let isToday = point.index == menuTokenPoints.count - 1
-    return VStack(spacing: 2) {
-      Text(language.tokenDateLabel(point.bucket.startDate))
-        .fontWeight(isToday ? .semibold : .regular)
-        .monospacedDigit()
-      Text(language.tokenWeekdayLabel(point.bucket.startDate))
-        .opacity(isToday ? 1 : 0.7)
-    }
-    .font(.system(size: 9))
-    .foregroundStyle(isToday ? Color.accentColor : Color.secondary)
-    .padding(.horizontal, 3)
-    .padding(.vertical, 3)
-    .background(
-      isToday ? Color.accentColor.opacity(0.10) : .clear,
-      in: RoundedRectangle(cornerRadius: 5)
-    )
-    .padding(.bottom, 14)
-  }
-
-  private func resetHelp(_ event: GlobalResetEvent) -> String {
-    let description =
-      language == .simplifiedChinese
-      ? "Tibo 全局重置完成记录（社区收录）"
-      : "Tibo global reset confirmation (community archive)"
-    return description + "\n" + language.resetDisplayText(event.confirmedAt)
-      + " · " + TimeZone.current.identifier + "\n" + event.sourceURL.absoluteString
+    return language == .simplifiedChinese
+      ? "Gemini 更新 · \(updated)"
+      : "Gemini updated · \(updated)"
   }
 
   private var resetForecastSection: some View {
@@ -446,10 +306,15 @@ struct UsageMenuView: View {
       }
       .font(.system(size: 9))
     }
+    .padding(12)
+    .background(
+      .primary.opacity(0.04),
+      in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+    )
     .help(
       language == .simplifiedChinese
-        ? "社区实验性概率，非官方时间表。RESET 为社区收录的 Tibo 完成记录，按本机时区显示；点击标记可看原帖。"
-        : "Experimental community estimates. RESET marks link to archived Tibo confirmations in your local time zone."
+        ? "社区实验性概率，不是官方时间表。数据源为 codex-reset.com。"
+        : "Experimental community estimates, not an official schedule. Source: codex-reset.com."
     )
   }
 
@@ -502,10 +367,6 @@ struct UsageMenuView: View {
     }
   }
 
-  private var nextResetText: String {
-    language == .simplifiedChinese ? "下次额度重置" : "Next quota reset"
-  }
-
   private var actionsSection: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 10) {
@@ -555,10 +416,6 @@ struct UsageMenuView: View {
     language == .simplifiedChinese
       ? "每分钟自动更新"
       : "Updates every minute"
-  }
-
-  private var remainingColor: Color {
-    remainingColor(for: viewModel.snapshot?.remainingPercent)
   }
 
   private func remainingColor(for remainingPercent: Double?) -> Color {
@@ -750,6 +607,13 @@ private struct LanguageSwitcher: View {
 private struct UsageProgressBar: View {
   let value: Double
   let color: Color
+  let height: CGFloat
+
+  init(value: Double, color: Color, height: CGFloat = 9) {
+    self.value = value
+    self.color = color
+    self.height = height
+  }
 
   var body: some View {
     GeometryReader { geometry in
@@ -771,7 +635,7 @@ private struct UsageProgressBar: View {
           .shadow(color: color.opacity(0.28), radius: 3, y: 1)
       }
     }
-    .frame(height: 9)
+    .frame(height: height)
   }
 }
 

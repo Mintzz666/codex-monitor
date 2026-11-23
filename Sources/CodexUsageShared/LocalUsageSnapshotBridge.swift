@@ -11,13 +11,16 @@ public enum LocalUsageSnapshotBridgeConfiguration {
 public struct LocalUsageSnapshotPayload: Codable, Equatable, Sendable {
   public let snapshot: SharedUsageSnapshot?
   public let languageCode: String?
+  public let geminiQuota: GeminiQuotaSnapshot?
 
   public init(
     snapshot: SharedUsageSnapshot?,
-    languageCode: String?
+    languageCode: String?,
+    geminiQuota: GeminiQuotaSnapshot? = nil
   ) {
     self.snapshot = snapshot
     self.languageCode = languageCode
+    self.geminiQuota = geminiQuota
   }
 }
 
@@ -30,6 +33,7 @@ public final class LocalUsageSnapshotServer: @unchecked Sendable {
 
   private var snapshot: SharedUsageSnapshot?
   private var languageCode: String?
+  private var geminiQuota: GeminiQuotaSnapshot?
   private var listener: NWListener?
   private var connections: [ObjectIdentifier: NWConnection] = [:]
   private var nextPortIndex = 0
@@ -83,6 +87,12 @@ public final class LocalUsageSnapshotServer: @unchecked Sendable {
   public func updateLanguage(_ languageCode: String) {
     snapshotLock.lock()
     self.languageCode = languageCode
+    snapshotLock.unlock()
+  }
+
+  public func updateGeminiQuota(_ quota: GeminiQuotaSnapshot?) {
+    snapshotLock.lock()
+    geminiQuota = quota
     snapshotLock.unlock()
   }
 
@@ -164,10 +174,19 @@ public final class LocalUsageSnapshotServer: @unchecked Sendable {
     snapshotLock.lock()
     let snapshot = self.snapshot
     let languageCode = self.languageCode
+    let geminiQuota = self.geminiQuota
     snapshotLock.unlock()
 
     let data: Data?
-    if let snapshot {
+    if let geminiQuota, !geminiQuota.isStale(),
+      let combined = try? JSONEncoder().encode(
+        LocalUsageSnapshotPayload(
+          snapshot: snapshot, languageCode: languageCode, geminiQuota: geminiQuota)
+      ),
+      combined.count <= LocalUsageSnapshotBridgeConfiguration.maximumPayloadSize
+    {
+      data = combined
+    } else if let snapshot {
       data = try? JSONEncoder().encode(snapshot)
     } else if let languageCode {
       data = try? JSONEncoder().encode(

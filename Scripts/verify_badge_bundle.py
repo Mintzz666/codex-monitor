@@ -13,7 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLE = ROOT / "Resources" / "CodexUsageBadge"
 MANIFEST = BUNDLE / "manifest.json"
-PINNED_SHA256 = "d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db"
+PINNED_SHA256 = "0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69"
 
 
 def sha256(path: Path) -> str:
@@ -56,7 +56,7 @@ def make_manifest(files: dict[str, str]) -> dict[str, object]:
         "schemaVersion": 1,
         "product": "Codex Usage Badge",
         "upstreamVersion": "0.9.1",
-        "buildId": "mintzz-optimized-gpt-folder-sync-sg-sin",
+        "buildId": "mintzz-gemini-quota",
         "pinnedAgentSHA256": PINNED_SHA256,
         "originalRepository": "https://github.com/jaykinhoo9/codex-usage-badge",
         "license": "MIT",
