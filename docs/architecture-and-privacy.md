@@ -67,10 +67,11 @@ history available.
   the existing wake handler refreshes stale data. These hooks run inside the app.
 - Reset data: unauthenticated public JSON requests to codex-reset.com; no
   account-specific data is sent.
-- Gemini quota comes from the running Antigravity client's loopback service or
-  the official CLI bundled with Gemini for Mac. The CLI uses your Google sign-in
+- Gemini quota comes from the local service of a running Antigravity or Gemini
+  for Mac client, with a fallback to the official CLI bundled with Gemini for
+  Mac. The CLI uses your Google sign-in
   to run the read-only `/usage` command. Monitor does not read Google OAuth
-  tokens. It keeps the Antigravity local request token in process memory and
+  tokens. It keeps the local service request token in process memory and
   sends it only to the authenticated local service. Gemini refresh is separate
   from Codex refresh.
 - Project: no analytics, ads, telemetry SDK, cloud database, or Codex

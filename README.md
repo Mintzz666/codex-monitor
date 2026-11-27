@@ -24,18 +24,18 @@ one place. No separate Badge installation is required.
 
 | At a glance | On your desktop | Inside ChatGPT |
 |---|---|---|
-| Codex and Gemini quota with reset times | Medium and large WidgetKit widgets | Quota badge, folder colors, Recent thread matching and Token shades |
+| Codex and Gemini quota, reset times, and public reset radar | Codex quota and recent Token activity in WidgetKit | Quota badge, folder colors, Recent thread matching and Token shades |
 
 <p align="center"><img src="docs/images/usage-popover-en.png" width="344" alt="Codex Monitor English menu preview with example usage values" /></p>
 <p align="center"><sub>Preview with example usage values. The app supports English and Simplified Chinese.</sub></p>
 
-## New in 1.6
+## Gemini quota in 1.6.1
 
 - Three compact quota bars for Codex weekly, Gemini weekly and Gemini 5-hour usage.
 - An in-sidebar badge with two Gemini rings, reset times on hover and the Codex percentage below.
-- Background Gemini quota reads using the signed-in CLI bundled with Gemini for Mac when both desktop apps are closed.
+- Monitor checks running Antigravity and Gemini for Mac clients. When neither returns quota, it tries the signed-in CLI bundled with Gemini for Mac, including when both apps are closed.
 
-See the [1.6.0 release notes](docs/release-notes/v1.6.0.md) for requirements.
+See the [1.6.1 release notes](docs/release-notes/v1.6.1.md) for requirements.
 
 ## Sidebar colors that stay with your projects
 
@@ -73,7 +73,7 @@ ChatGPT with ⌘Q and reopen it from its usual icon; no reinstall is needed.
 | Component | Source | Refresh |
 |---|---|---|
 | Menu bar app | Local `codex app-server` | About once a minute after a successful read |
-| Gemini quota | Running Antigravity or the signed-in CLI bundled with Gemini for Mac | About once a minute with Antigravity open, about every two minutes via CLI |
+| Gemini quota | Running Antigravity or Gemini for Mac, with a fallback to the signed-in Gemini for Mac CLI | About once a minute with Antigravity open, about every two minutes otherwise |
 | Desktop widgets | Sanitized App Group snapshot; loopback fallback for supported builds | WidgetKit timeline |
 | ChatGPT appearance | The same Monitor quota snapshot; included local helper | About every 5 seconds |
 | Global reset radar | Public [codex-reset.com](https://codex-reset.com/) records and forecast | About every 5 minutes while Monitor runs |

@@ -16,13 +16,13 @@
 
 ---
 
-## 1.6 更新
+## 1.6.1 Gemini 额度
 
 - 菜单栏集中显示 Codex 周额度、Gemini 周额度和 Gemini 5 小时额度。
 - ChatGPT 左侧徽章加入 Gemini 双环，悬停可看重置时间，下方显示 Codex 百分比。
-- 两个 Google 图形界面都关闭时，可通过 Gemini for Mac 自带且已登录的 CLI 在后台查询额度。
+- 优先查询运行中的 Antigravity 和 Gemini for Mac。如果两个客户端均未返回额度，Monitor 会尝试 Gemini for Mac 自带且已登录的 CLI，两个图形界面关闭时也可查询。
 
-使用条件见 [1.6.0 发布说明](docs/release-notes/v1.6.0.md)。
+使用条件见 [1.6.1 发布说明](docs/release-notes/v1.6.1.md)。
 
 ## 随手查看，统一管理
 
@@ -31,7 +31,7 @@
 
 | 菜单栏一览 | 桌面常驻 | ChatGPT 外观增强 |
 |---|---|---|
-| Codex 和 Gemini 剩余额度与重置时间 | 中型与大型 WidgetKit 小组件 | 额度徽章、文件夹颜色继承、Recent 会话匹配与 Token 色阶 |
+| Codex 和 Gemini 剩余额度、重置时间和公开重置雷达 | WidgetKit 小组件显示 Codex 额度与近期 Token 用量 | 额度徽章、文件夹颜色继承、Recent 会话匹配与 Token 色阶 |
 
 <p align="center"><img src="docs/images/usage-popover.png" width="344" alt="Codex Monitor 中文菜单示意图，使用演示用量数据" /></p>
 <p align="center"><sub>用量为演示数据。应用支持简体中文和 English。</sub></p>
@@ -69,7 +69,7 @@ Windows 仍属后续移植方向；仓库中的上游 Windows 参考代码不代
 | 组件 | 数据来源 | 刷新方式 |
 |---|---|---|
 | 菜单栏 | 本机 `codex app-server` | 成功读取后约每分钟 |
-| Gemini 额度 | 正在运行的 Antigravity 或 Gemini for Mac 自带且已登录的 CLI | Antigravity 运行时约每分钟，CLI 约每两分钟 |
+| Gemini 额度 | 运行中的 Antigravity 或 Gemini for Mac，失败时尝试 Gemini for Mac 自带且已登录的 CLI | Antigravity 运行时约每分钟，其他情况约每两分钟 |
 | 桌面小组件 | 脱敏 App Group 快照；支持的构建可回退到本机回环接口 | WidgetKit 时间线 |
 | ChatGPT 外观增强 | 同一份 Monitor 额度快照；内置本地后台助手 | 约每 5 秒 |
 | 全局重置雷达 | [codex-reset.com](https://codex-reset.com/) 的公开记录与预测 | Monitor 运行时约每 5 分钟 |
