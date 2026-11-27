@@ -1,10 +1,13 @@
 function installThreadTokens() {
-  const VERSION = 12;
+  const VERSION = 13;
   const KEY = '__codexThreadTokens';
-  const ROW = '[data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-id]';
+  const ROW = '[data-app-action-sidebar-thread-row]';
+  const TITLE = '[data-thread-title]';
   const PROJECT_ROW = '[data-app-action-sidebar-project-row][data-app-action-sidebar-project-id]';
   const PROJECT_CONTAINER = '[data-sidebar-project-container-id^="project:"]';
   const MARK = 'data-codex-thread-tokens';
+  const SIDEBAR_NODES = `${ROW}, ${PROJECT_ROW}, ${PROJECT_CONTAINER}`;
+  const TEXT_CONTAINERS = ['block', 'flow-root', 'inline', 'inline-block', 'list-item', 'table-cell'];
   if (window[KEY]?.version === VERSION) { window[KEY].refresh(); return; }
   window[KEY]?.destroy?.();
   let snapshot = { ok: false, totals: {}, projectNames: {}, checkedAt: null };
@@ -104,19 +107,21 @@ function installThreadTokens() {
     // beside the outer title creates a new flex/line item and distorts the list.
     // Anchor beside its inline text run instead, without moving or wrapping text.
     const walker = document.createTreeWalker(title, NodeFilter.SHOW_TEXT);
-    let textNode = null;
-    while (walker.nextNode()) textNode = walker.currentNode;
-    const leaf = textNode?.parentElement;
-    if (!leaf) return null;
-    const leafDisplay = getComputedStyle(leaf).display;
-    if (leafDisplay.startsWith('inline') && leaf.parentElement &&
-        getComputedStyle(leaf.parentElement).display.startsWith('inline')) {
-      return { parent: leaf.parentElement, before: leaf };
+    for (let textNode = walker.nextNode(); textNode; textNode = walker.nextNode()) {
+      if (!textNode.data.trim()) continue;
+      const leaf = textNode.parentElement;
+      const decoration = leaf.closest(`[${MARK}], [hidden], [aria-hidden="true"], script, style`);
+      if (decoration && title.contains(decoration)) continue;
+      const display = getComputedStyle(leaf).display;
+      if (leaf !== title && display.startsWith('inline') &&
+          getComputedStyle(leaf.parentElement).display.startsWith('inline')) {
+        return { parent: leaf.parentElement, before: leaf };
+      }
+      if (TEXT_CONTAINERS.includes(display)) return { parent: leaf, before: textNode };
     }
-    if (['block', 'flow-root', 'inline', 'inline-block', 'list-item', 'table-cell'].includes(leafDisplay)) {
-      return { parent: leaf, before: textNode };
-    }
-    return null;
+    return TEXT_CONTAINERS.includes(getComputedStyle(title).display)
+      ? { parent: title, before: title.firstChild }
+      : null;
   }
   function level(total) {
     // Fixed thresholds keep the same color when the sidebar list changes.
@@ -187,24 +192,29 @@ function installThreadTokens() {
     projectAssignments = buildProjectAssignments(rows);
     const owned = new Set(badges.values());
     for (const badge of document.querySelectorAll(`[${MARK}]`)) if (!owned.has(badge)) badge.remove();
+    const currentRows = new Set(rows);
     for (const [row, badge] of badges) {
-      const title = row.querySelector('[data-thread-title]');
-      const slot = title && markerSlot(title);
-      if (!row.isConnected || !row.matches(ROW) || !slot || badge.parentNode !== slot.parent || badge.nextSibling !== slot.before) {
-        if (hovered === badge) hideTooltip(); badge.remove(); badges.delete(row);
-      }
+      if (currentRows.has(row)) continue;
+      if (hovered === badge) hideTooltip();
+      badge.remove();
+      badges.delete(row);
     }
     for (const row of rows) {
-      const title = row.querySelector('[data-thread-title]');
-      if (!title?.parentElement) continue;
-      const slot = markerSlot(title);
-      if (!slot) continue;
+      const title = row.querySelector(TITLE);
+      const slot = title && markerSlot(title);
       let badge = badges.get(row);
+      if (!slot) {
+        if (badge && !title?.contains(badge)) badge.remove();
+        continue;
+      }
       if (!badge) {
         // Insert into the title's inline text flow; never wrap or move React content.
         badge = document.createElement('span'); badge.setAttribute(MARK, ''); badge.setAttribute('role', 'img');
         badge.setAttribute('aria-describedby', tooltip.id);
-        slot.parent.insertBefore(badge, slot.before); badges.set(row, badge);
+        badges.set(row, badge);
+      }
+      if (badge !== slot.before && (badge.parentNode !== slot.parent || badge.nextSibling !== slot.before)) {
+        slot.parent.insertBefore(badge, slot.before);
       }
       render(row, badge);
     }
@@ -250,10 +260,26 @@ function installThreadTokens() {
     hideTooltip(); scheduleRefresh();
   }
   const observer = new MutationObserver(records => {
-    if (records.some(r => !r.target.closest?.(`[${MARK}]`) && r.target !== tooltip && !tooltip.contains(r.target) && r.target !== style)) scheduleRefresh();
+    const sidebarChanged = records.some(record => {
+      const target = record.target.nodeType === Node.ELEMENT_NODE ? record.target : record.target.parentElement;
+      if (!target || target === style || tooltip.contains(target) || target.closest(`[${MARK}]`)) return false;
+      if (record.type === 'attributes') return true;
+      if (record.type === 'characterData') return !!target.closest(TITLE)?.closest(ROW);
+
+      const row = target.closest(ROW);
+      const badge = badges.get(row);
+      const changedNodes = [...record.addedNodes, ...record.removedNodes];
+      if (badge && !badge.isConnected && changedNodes.includes(badge)) return true;
+      const nativeNodes = changedNodes.filter(node => !node.matches?.(`[${MARK}]`));
+      if (row || target.closest(PROJECT_ROW)) return nativeNodes.length > 0;
+      return nativeNodes.some(node => node.matches?.(SIDEBAR_NODES) || node.querySelector?.(SIDEBAR_NODES));
+    });
+    // Restore a detached marker in the mutation batch, before the next paint.
+    if (sidebarChanged) refresh();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true,
-    attributeFilter: ['data-app-action-sidebar-thread-id', 'data-app-action-sidebar-thread-host-id', 'data-app-action-sidebar-thread-kind',
+    characterData: true,
+    attributeFilter: ['data-app-action-sidebar-thread-row', 'data-app-action-sidebar-thread-id', 'data-app-action-sidebar-thread-host-id', 'data-app-action-sidebar-thread-kind',
       'data-app-action-sidebar-project-id', 'data-sidebar-project-kind', 'data-sidebar-project-container-id'] });
   const freshnessTimer = setInterval(() => { for (const [row, badge] of badges) render(row, badge); }, 1000);
   // Capture before the native sidebar can stop bubbling; movement also repairs missed enters.

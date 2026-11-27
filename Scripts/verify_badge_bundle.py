@@ -13,7 +13,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLE = ROOT / "Resources" / "CodexUsageBadge"
 MANIFEST = BUNDLE / "manifest.json"
-PINNED_SHA256 = "0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69"
+PINNED_SHA256 = "8cd9c71f92a204878d0b069f519f4e6495c234febebc20d1c973c08e925eeff7"
 
 
 def sha256(path: Path) -> str:

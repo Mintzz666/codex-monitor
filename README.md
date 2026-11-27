@@ -56,6 +56,10 @@ real chats, file paths, account details or quota values are shown.*
 4. For the optional appearance integration, open **ChatGPT Appearance** in Monitor
    and choose **Install / Update / Repair**. ChatGPT’s bundled Node.js runtime is required.
 
+ChatGPT Plus users can sign in to Codex with their own ChatGPT account to see
+the limits reported for that account. Gemini is optional. The menu shows a
+Gemini quota bar for each window Monitor can read.
+
 **macOS 13 or later · Apple Silicon and Intel.** Community builds are ad-hoc
 signed. If macOS blocks the first launch, use its **Open** / **Open Anyway**
 flow or build from source. Windows is a future port; the upstream Windows

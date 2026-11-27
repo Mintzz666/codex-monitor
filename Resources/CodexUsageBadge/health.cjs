@@ -9,10 +9,10 @@ const { execFileSync } = require('node:child_process');
 const SUPPORT = path.join(os.homedir(), 'Library/Application Support/CodexUsageBadge');
 const CHATGPT_APP = process.env.CODEX_BADGE_APP || '/Applications/ChatGPT.app';
 process.env.CODEX_BADGE_APP = CHATGPT_APP;
-const EXPECTED_BADGE_SHA256 = '0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69';
+const EXPECTED_BADGE_SHA256 = '8cd9c71f92a204878d0b069f519f4e6495c234febebc20d1c973c08e925eeff7';
 const UI_BADGE_VERSION = 49;
 const PROJECT_COLORS_VERSION = 5;
-const THREAD_TOKENS_VERSION = 12;
+const THREAD_TOKENS_VERSION = 13;
 
 function sha256(file) {
   try {

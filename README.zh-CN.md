@@ -55,6 +55,9 @@
 4. 若需要外观增强，在 Monitor 的 **ChatGPT 外观增强** 中选择 **安装 / 更新 / 修复**。
    该功能需要 ChatGPT 自带的 Node.js 运行时。
 
+ChatGPT Plus 用户可用自己的 ChatGPT 账号登录 Codex，查看该账号实际返回的额度。
+Gemini 功能可选。菜单仅在读到 Gemini 额度时显示相应的额度条。
+
 **macOS 13+ · 同时支持 Apple Silicon 与 Intel。** 社区构建使用临时签名；
 首次启动受系统拦截时，按 macOS 的“打开”或“仍要打开”流程处理，也可自行构建。
 Windows 仍属后续移植方向；仓库中的上游 Windows 参考代码不代表已发布 Windows 版。

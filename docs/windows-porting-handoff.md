@@ -104,11 +104,10 @@ Windows 端可采用有用户 ACL 的 Named Pipe，或其他经过论证的本�
 
 ### 外观和 ChatGPT 注入
 
-定制 Badge 以固定 SHA-256 校验，当前 pinned agent 为
-`d6e1b2d1cff2ef63964fe7b31797357d0ff25c397bdb66de351c87b1a48541db`。
+定制 Badge 以 [manifest.json](../Resources/CodexUsageBadge/manifest.json) 中的固定 SHA-256 校验。
 验收接口要求同时核对 bundle、安装版、管理器、后台进程、额度快照和实际
 页面注入标记。当前页面检查至少确认 Badge 唯一显示，项目颜色版本为 5，
-会话 Token 版本为 12。
+会话 Token 版本为 13。
 
 macOS 通过 ChatGPT 的 CDP 地址
 `http://127.0.0.1:39222/json/list` 检查页面。若不可达，提示用户按原方式

@@ -4,7 +4,7 @@ support="$HOME/Library/Application Support/CodexUsageBadge"
 custom="$support/local-customization/project-thread-color"
 optimized="$custom/agent-folder-color.cjs"
 active="$support/agent.cjs"
-expected="0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69"
+expected="8cd9c71f92a204878d0b069f519f4e6495c234febebc20d1c973c08e925eeff7"
 if [[ ! -f "$optimized" ]]; then
   print -u2 "找不到已记录的优化构建：$optimized"
   exit 1

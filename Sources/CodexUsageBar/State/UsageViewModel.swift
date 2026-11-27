@@ -293,7 +293,7 @@ final class UsageViewModel: ObservableObject {
       geminiQuotaIsStale = false
       localUsageServer.updateGeminiQuota(result)
     } else {
-      geminiQuotaIsStale = true
+      geminiQuotaIsStale = geminiQuota != nil
       localUsageServer.updateGeminiQuota(nil)
     }
   }

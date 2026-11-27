@@ -18,10 +18,10 @@ const {
   installSharedQuotaAdapter
 } = require('../Resources/CodexUsageBadge/shared-quota.cjs');
 
-const PINNED_AGENT_SHA256 = '0142ba6c2e23409d5ece376d8baea5136cfcaaac572c60c11ed48ae3b9d6bc69';
+const PINNED_AGENT_SHA256 = '8cd9c71f92a204878d0b069f519f4e6495c234febebc20d1c973c08e925eeff7';
 const FUNCTION_SHA256 = {
   installProjectColors: '317b03ec71c69152a483a74339261bc3af5862e347cedda2e302add33d111506',
-  installThreadTokens: '062eaf3025419b9dd585406c7cc0b5966c6a4217b7915f1da22b0efb7d627148',
+  installThreadTokens: '8e2418e4906e9b8ab1b7163f03dc2d0312140237da16125a8c3f0ddcbd8409a7',
   ThreadTokenReader: '441b591c5cf4f08b4092de4c2e43d34dc6bae659a29e1b58961e63703816d657'
 };
 const NOW = Date.UTC(2026, 9, 29, 12, 0, 0);

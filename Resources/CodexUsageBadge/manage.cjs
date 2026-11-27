@@ -228,7 +228,7 @@ async function activate({allowRestart=false,foreground=false}={}) {
     try {
       const pages=await targets();
       const results=await Promise.all(pages.map(async t=>({target:t,status:await evaluate(t,'window.__codexUsageBadge?.status() ?? null'),colors:await evaluate(t,'window.__codexProjectColors?.status() ?? null'),tokens:await evaluate(t,'window.__codexThreadTokens?.status() ?? null')})));
-      const shown=results.filter(r=>r.status?.placed&&r.status.badgeCount===1&&r.status.version===49&&!r.status.stale&&Number.isFinite(r.status.updatedAt)&&Date.now()-r.status.updatedAt<150000&&r.colors?.version===5&&r.tokens?.version===12);
+      const shown=results.filter(r=>r.status?.placed&&r.status.badgeCount===1&&r.status.version===49&&!r.status.stale&&Number.isFinite(r.status.updatedAt)&&Date.now()-r.status.updatedAt<150000&&r.colors?.version===5&&r.tokens?.version===13);
       if(shown.length&&/state = running/.test(loaded(label)||'')) {
         uiWasShown=true;
         const target=shown[0].target;

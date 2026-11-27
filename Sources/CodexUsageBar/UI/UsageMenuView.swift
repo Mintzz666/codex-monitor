@@ -94,11 +94,6 @@ struct UsageMenuView: View {
               viewModel.geminiQuotaIsStale ? Color.orange : Color.secondary
             )
             .lineLimit(1)
-        } else if viewModel.geminiQuotaIsStale {
-          Text(language == .simplifiedChinese ? "Gemini 暂不可用" : "Gemini unavailable")
-            .font(.system(size: 9))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
         }
       }
 
@@ -114,26 +109,28 @@ struct UsageMenuView: View {
         additionalWindowSection(window)
       }
 
-      Divider()
+      if let weekly = viewModel.geminiQuota?.weekly {
+        Divider()
+        quotaRow(
+          label: language == .simplifiedChinese ? "Gemini 周额度" : "Gemini weekly",
+          remainingPercent: weekly.remainingPercent,
+          resetsAt: weekly.resetsAt,
+          color: .green,
+          barHeight: 7
+        )
+      }
 
-      quotaRow(
-        label: language == .simplifiedChinese ? "Gemini 周额度" : "Gemini weekly",
-        remainingPercent: viewModel.geminiQuota?.weekly?.remainingPercent,
-        resetsAt: viewModel.geminiQuota?.weekly?.resetsAt,
-        color: .green,
-        barHeight: 7
-      )
-
-      Divider()
-
-      quotaRow(
-        label: language == .simplifiedChinese ? "Gemini 5 小时额度" : "Gemini 5-hour",
-        remainingPercent: viewModel.geminiQuota?.fiveHour?.remainingPercent,
-        resetsAt: viewModel.geminiQuota?.fiveHour?.resetsAt,
-        color: .blue,
-        barHeight: 7,
-        showsRelativeCountdown: true
-      )
+      if let fiveHour = viewModel.geminiQuota?.fiveHour {
+        Divider()
+        quotaRow(
+          label: language == .simplifiedChinese ? "Gemini 5 小时额度" : "Gemini 5-hour",
+          remainingPercent: fiveHour.remainingPercent,
+          resetsAt: fiveHour.resetsAt,
+          color: .blue,
+          barHeight: 7,
+          showsRelativeCountdown: true
+        )
+      }
     }
     .padding(12)
     .background(

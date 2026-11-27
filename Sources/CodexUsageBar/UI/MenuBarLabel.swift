@@ -95,9 +95,11 @@ final class StatusBarController: NSObject {
     }
     .store(in: &cancellables)
 
-    Publishers.CombineLatest(viewModel.$resetRadar, viewModel.$resetRadarError)
+    Publishers.CombineLatest3(
+      viewModel.$resetRadar, viewModel.$resetRadarError, viewModel.$geminiQuota
+    )
       .receive(on: RunLoop.main)
-      .sink { [weak self] _, _ in
+      .sink { [weak self] _, _, _ in
         if self?.popover.isShown == true {
           self?.resizePopoverToFitContent()
         }
